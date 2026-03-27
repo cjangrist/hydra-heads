@@ -440,7 +440,7 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
 
     timed_out = False
     aborted_during_wait = False
-    deadline = (start_time + timeout_seconds) if timeout_seconds else None
+    deadline = (start_time + timeout_seconds) if timeout_seconds is not None else None
 
     try:
         while True:
@@ -767,7 +767,7 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
 
     logger.info(f"Providers: {', '.join(provider_names)}")
     logger.info(f"Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
-    if timeout_seconds:
+    if timeout_seconds is not None:
         logger.info(f"Timeout: {timeout_seconds}s per provider")
     if working_directory:
         working_directory = str(Path(working_directory).resolve())
