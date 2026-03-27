@@ -823,8 +823,8 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
         try:
             commands[provider_config["name"]] = _resolve_command(provider_config)
         except HydraError:
-            if ignore_errors:
-                logger.warning(f"Skipping {provider_config['name']}: binary not found (--ignore-errors)")
+            if ignore_errors or preflight:
+                logger.warning(f"Skipping {provider_config['name']}: binary not found")
                 skipped_providers.append(provider_config["name"])
             else:
                 raise
