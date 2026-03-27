@@ -50,7 +50,6 @@ def _resolve_prompt(args: argparse.Namespace) -> str:
 
 def _run_status_check(args: argparse.Namespace) -> None:
     """Ping all providers and display health status table."""
-    import json
     from hydra_heads.core import (
         HydraError, _preflight_ping, _resolve_command,
         PREFLIGHT_PING_TIMEOUT_SECONDS,

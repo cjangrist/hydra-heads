@@ -715,7 +715,7 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                             "status": "error", "logs": {"stdout": "", "stderr": ""},
                         }
                     results[name] = result_data
-                    if result_data["exit_code"] != 0 and not ignore_errors:
+                    if result_data["exit_code"] != 0 and result_data.get("status") != "aborted" and not ignore_errors:
                         failure_summary.append(f"{name}: exit_code={result_data['exit_code']}")
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
