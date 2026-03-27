@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hydra-heads"
+version = "0.1.0"
+description = "Run multiple AI CLI tools in parallel with a shared prompt"
+requires-python = ">=3.8"
+dependencies = [
+    "sh>=2.0",
+    "python-dotenv>=1.0",
+    "coloredlogs>=15.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+hydra-heads = "hydra_heads.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["hydra_heads*"]
