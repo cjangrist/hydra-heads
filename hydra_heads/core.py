@@ -112,10 +112,10 @@ def _detect_model(provider_config: dict, model_override: str = None) -> str:
     """Detect the model a provider will use. Returns model name or empty string."""
     name = provider_config["name"]
 
-    if model_override:
-        return model_override
-
     model_flag = provider_config.get("model_flag")
+
+    if model_override and model_flag:
+        return model_override
     if model_flag:
         args = provider_config.get("args", [])
         if model_flag in args:
@@ -232,7 +232,10 @@ def _prepare_task_directory(log_base_directory: str, prompt: str) -> str:
     unique_suffix = uuid.uuid4().hex[:8]
     task_directory_name = f"{iso_timestamp}-{task_hash}-{unique_suffix}"
     task_path = Path(log_base_directory).resolve() / task_directory_name
-    task_path.mkdir(parents=True, exist_ok=True)
+    try:
+        task_path.mkdir(parents=True, exist_ok=True)
+    except OSError as mkdir_error:
+        raise HydraError(f"Cannot create log directory {task_path}: {mkdir_error}")
     logger.debug(f"_prepare_task_directory created {task_path}")
     return str(task_path)
 

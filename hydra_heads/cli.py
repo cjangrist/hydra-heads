@@ -27,7 +27,10 @@ def _resolve_prompt(args: argparse.Namespace) -> str:
         file_path = Path(args.prompt_file)
         if not file_path.is_file():
             raise SystemExit(f"ERROR: Prompt file does not exist: {args.prompt_file}")
-        return file_path.read_text(encoding="utf-8").strip()
+        try:
+            return file_path.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeDecodeError) as read_error:
+            raise SystemExit(f"ERROR: Cannot read prompt file: {read_error}")
 
     if args.prompt:
         if args.prompt == "-":
