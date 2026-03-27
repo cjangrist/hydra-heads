@@ -370,6 +370,8 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
             while not stop_polling.is_set():
                 try:
                     current_size = os.path.getsize(stdout_log)
+                    if current_size < stdout_position:
+                        stdout_position = 0
                     if current_size > stdout_position:
                         with open(stdout_log, "rb") as log_file:
                             log_file.seek(stdout_position)
@@ -382,6 +384,8 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
                     pass
                 try:
                     stderr_size = os.path.getsize(stderr_log)
+                    if stderr_size < stderr_position:
+                        stderr_position = 0
                     if stderr_size > stderr_position:
                         with open(stderr_log, "rb") as log_file:
                             log_file.seek(stderr_position)
