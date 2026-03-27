@@ -823,12 +823,8 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             sigint_received[0] = True
             os.write(2, b"hydra-heads: Received SIGINT, aborting all providers...\n")
             abort_event.set()
-            snapshot = list(running_processes.values())
-            for process_handle in snapshot:
+            for process_handle in list(running_processes.values()):
                 _kill_process_group(process_handle.pid, signal.SIGTERM)
-            time.sleep(0.5)
-            for process_handle in snapshot:
-                _kill_process_group(process_handle.pid, signal.SIGKILL)
 
         signal.signal(signal.SIGINT, sigint_handler)
 
