@@ -407,6 +407,11 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
     if working_directory:
         sh_kwargs["_cwd"] = working_directory
 
+    # DESIGN: There is a small window between command() returning and the process being
+    # registered in running_processes. If SIGINT fires in this window, this process is not
+    # killed by the signal handler. This is acceptable: the process is registered immediately
+    # after launch (before any logging), and the post-launch abort_event check below catches
+    # the case where abort was signaled during this window and force-kills the process.
     start_time = time.monotonic()
     try:
         process = command(*command_args, **sh_kwargs)
@@ -728,6 +733,11 @@ def _build_streaming_display(provider_configs: list, display_names: dict = None)
             indicator, style = status_indicators.get(status, ("?", "white"))
             title = f"{name} [{indicator}{latency_string}]"
 
+            # DESIGN: list() creates an atomic snapshot of the deque under CPython's GIL,
+            # preventing RuntimeError from concurrent poll thread appends. This function is
+            # called under streaming_lock from update_display(). The poll thread appends
+            # without streaming_lock (deque.append is GIL-atomic), which is safe because
+            # list(deque) only needs a consistent snapshot, not mutual exclusion.
             all_text = "".join(list(buffers.get(name, [])))
             lines = all_text.split("\n")
             visible_lines = lines[-STREAM_PANEL_HEIGHT:] if len(lines) > STREAM_PANEL_HEIGHT else lines
@@ -815,6 +825,11 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
         sigint_received = [False]
 
         def sigint_handler(signum, frame):
+            # DESIGN: No lock acquisition here. Signal handlers run between bytecodes on the
+            # main thread. Acquiring process_lock would deadlock if a worker thread holds it.
+            # list(dict.values()) is GIL-atomic in CPython. Sending SIGTERM to a stale PID is
+            # harmless (_kill_process_group catches ProcessLookupError). The abort_event causes
+            # worker threads to do proper cleanup via _force_kill with SIGKILL escalation.
             if sigint_received[0]:
                 os.write(2, b"hydra-heads: Second SIGINT, force exiting\n")
                 signal.signal(signal.SIGINT, original_sigint_handler)
