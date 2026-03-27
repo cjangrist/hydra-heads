@@ -611,7 +611,7 @@ def _retry_launch_and_collect(command, provider_config: dict, prompt: str,
 def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bool,
                        ignore_errors: bool, abort_event: threading.Event,
                        running_processes: dict, process_lock: threading.Lock = None,
-                       stream_update_fn=None) -> tuple:
+                       stream_update_fn=None, display_names: dict = None) -> tuple:
     """Execute providers in parallel, handling fail-fast. Returns (results_dict, failure_summary_list)."""
     if process_lock is None:
         process_lock = threading.RLock()
@@ -620,6 +620,9 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
 
     if not provider_configs:
         return results, failure_summary
+
+    def _display(raw_name: str) -> str:
+        return (display_names or {}).get(raw_name, raw_name)
 
     executor = ThreadPoolExecutor(max_workers=len(provider_configs))
     try:
@@ -638,7 +641,7 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                 try:
                     name, result_data = future.result()
                 except Exception as worker_error:
-                    name = futures_map[future]
+                    name = _display(futures_map[future])
                     logger.warning(f"{name} worker raised {type(worker_error).__name__}: {worker_error}")
                     result_data = {
                         "response": "", "exit_code": -4, "latency_seconds": 0,
@@ -664,14 +667,14 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                         collected_name, collected_data = future.result()
                         results[collected_name] = collected_data
                     except Exception as collection_error:
-                        fname = futures_map[future]
+                        fname = _display(futures_map[future])
                         logger.warning(f"{fname} result collection failed: {type(collection_error).__name__}")
                         results[fname] = {
                             "response": "", "exit_code": -3, "latency_seconds": 0,
                             "status": "collection_timeout", "logs": {"stdout": "", "stderr": ""},
                         }
                 for future in not_done:
-                    fname = futures_map[future]
+                    fname = _display(futures_map[future])
                     logger.warning(f"{fname} did not complete within collection timeout")
                     results[fname] = {
                         "response": "", "exit_code": -3, "latency_seconds": 0,
@@ -914,13 +917,14 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
                 results, failure_summary = _execute_providers(
                     provider_configs, launch_provider, fail_fast, ignore_errors,
                     abort_event, running_processes, process_lock=process_lock,
-                    stream_update_fn=update_display,
+                    stream_update_fn=update_display, display_names=display_names,
                 )
                 update_display()
         else:
             results, failure_summary = _execute_providers(
                 provider_configs, launch_provider, fail_fast, ignore_errors,
                 abort_event, running_processes, process_lock=process_lock,
+                display_names=display_names,
             )
     finally:
         if is_main_thread and original_sigint_handler is not _SIGINT_NOT_SET:
