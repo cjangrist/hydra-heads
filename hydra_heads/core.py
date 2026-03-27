@@ -690,7 +690,7 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                     try:
                         name, result_data = future.result()
                     except Exception as worker_error:
-                        name = futures_map[future]
+                        name = _display(futures_map[future])
                         logger.warning(f"{name} worker raised {type(worker_error).__name__}: {worker_error}")
                         result_data = {
                             "response": "", "exit_code": -4, "latency_seconds": 0,

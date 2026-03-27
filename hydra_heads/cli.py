@@ -110,21 +110,26 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Prompt to send to all selected providers (use - for stdin)")
     parser.add_argument("--prompt-file", metavar="FILE",
                         help="Read prompt from a file (use - for stdin)")
-    def _safe_int_env(var_name: str, fallback: int) -> int:
+    def _safe_int_env(var_name: str, fallback: int, minimum: int = None) -> int:
         raw_value = os.getenv(var_name)
         if raw_value is None:
             return fallback
         try:
-            return int(raw_value)
+            parsed_value = int(raw_value)
         except ValueError:
             logger_cli = logging.getLogger("hydra_heads")
             logger_cli.warning(f"Invalid integer for {var_name}={raw_value!r}, using default {fallback}")
             return fallback
+        if minimum is not None and parsed_value < minimum:
+            logger_cli = logging.getLogger("hydra_heads")
+            logger_cli.warning(f"{var_name}={parsed_value} below minimum {minimum}, using default {fallback}")
+            return fallback
+        return parsed_value
 
     default_providers = os.getenv("HYDRA_PROVIDERS", ",".join(available))
-    default_timeout = _safe_int_env("HYDRA_TIMEOUT", 1800)
-    default_retries = _safe_int_env("HYDRA_RETRIES", 0)
-    default_ping_timeout = _safe_int_env("HYDRA_PING_TIMEOUT", 20)
+    default_timeout = _safe_int_env("HYDRA_TIMEOUT", 1800, minimum=1)
+    default_retries = _safe_int_env("HYDRA_RETRIES", 0, minimum=0)
+    default_ping_timeout = _safe_int_env("HYDRA_PING_TIMEOUT", 20, minimum=1)
     default_cwd = os.getenv("HYDRA_CWD")
 
     parser.add_argument("--providers", default=default_providers,
