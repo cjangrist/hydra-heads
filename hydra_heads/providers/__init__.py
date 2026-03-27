@@ -32,6 +32,13 @@ def _validate_provider_config(config: dict, source_name: str) -> bool:
     if not isinstance(config.get("args"), list):
         logger.warning(f"Provider '{source_name}' 'args' must be a list, skipping")
         return False
+    if not all(isinstance(a, str) for a in config["args"]):
+        logger.warning(f"Provider '{source_name}' 'args' must contain only strings, skipping")
+        return False
+    provider_env = config.get("env")
+    if provider_env is not None and not isinstance(provider_env, dict):
+        logger.warning(f"Provider '{source_name}' 'env' must be a dict or null, skipping")
+        return False
     prompt_flag = config.get("prompt_flag")
     if prompt_flag is not None and not isinstance(prompt_flag, str):
         logger.warning(f"Provider '{source_name}' 'prompt_flag' must be a string or null, skipping")
