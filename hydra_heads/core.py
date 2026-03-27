@@ -527,6 +527,7 @@ def _retry_launch_and_collect(command, provider_config: dict, prompt: str,
     """Retry wrapper around _launch_and_collect with exponential backoff. Tracks all attempts."""
     provider_name = provider_config["name"]
     all_attempts = []
+    max_retries = max(0, max_retries)
 
     for attempt in range(max_retries + 1):
         if attempt > 0:
