@@ -76,7 +76,7 @@ def _run_status_check(args: argparse.Namespace) -> None:
     if reachable_configs:
         try:
             healthy_configs = _preflight_ping(
-                reachable_configs, commands, args.log_dir, ping_timeout,
+                reachable_configs, commands, ping_timeout,
             )
             healthy_names = {pc["name"] for pc in healthy_configs}
         except HydraError:

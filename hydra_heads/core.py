@@ -253,7 +253,7 @@ def _prepare_log_paths(task_directory: str, provider_names: list) -> dict:
 
 
 def _preflight_ping(provider_configs: list, commands: dict,
-                    log_base_directory: str, ping_timeout: int = PREFLIGHT_PING_TIMEOUT_SECONDS,
+                    ping_timeout: int = PREFLIGHT_PING_TIMEOUT_SECONDS,
                     abort_event: threading.Event = None,
                     running_processes: dict = None,
                     process_lock: threading.Lock = None) -> list:
@@ -856,7 +856,7 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
     try:
         if preflight and provider_configs:
             provider_configs = _preflight_ping(
-                provider_configs, commands, log_base_directory, ping_timeout,
+                provider_configs, commands, ping_timeout,
                 abort_event=abort_event, running_processes=running_processes,
                 process_lock=process_lock,
             )
