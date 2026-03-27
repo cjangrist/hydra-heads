@@ -644,11 +644,6 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                         snapshot = list(running_processes.items())
                     for process_name, process_handle in snapshot:
                         _force_kill(process_handle, process_name)
-                    with process_lock:
-                        late_arrivals = [(n, p) for n, p in running_processes.items()
-                                         if (n, p) not in snapshot]
-                    for process_name, process_handle in late_arrivals:
-                        _force_kill(process_handle, process_name)
                     break
 
             uncollected = {f for f in futures_map if f not in collected_futures}
