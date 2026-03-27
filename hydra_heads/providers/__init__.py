@@ -22,6 +22,10 @@ def _validate_provider_config(config: dict, source_name: str) -> bool:
     if not isinstance(config.get("name"), str) or not config["name"]:
         logger.warning(f"Provider '{source_name}' 'name' must be a non-empty string, skipping")
         return False
+    import re as _re
+    if _re.search(r'[/\\.\s]', config["name"]):
+        logger.warning(f"Provider '{source_name}' 'name' contains invalid characters (/, \\, ., space), skipping")
+        return False
     if not isinstance(config.get("binary"), str) or not config["binary"]:
         logger.warning(f"Provider '{source_name}' 'binary' must be a non-empty string, skipping")
         return False
