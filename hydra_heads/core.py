@@ -321,7 +321,10 @@ def _preflight_ping(provider_configs: list, commands: dict,
 
         return healthy_providers
     finally:
-        shutil.rmtree(ping_directory, ignore_errors=True)
+        try:
+            shutil.rmtree(ping_directory)
+        except OSError as cleanup_error:
+            logger.debug(f"Failed to clean up preflight directory {ping_directory}: {cleanup_error}")
 
 
 def _launch_and_collect(command, provider_config: dict, prompt: str,
@@ -644,7 +647,10 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
             for future in as_completed(futures_map):
                 collected_futures.add(future)
                 if stream_update_fn:
-                    stream_update_fn()
+                    try:
+                        stream_update_fn()
+                    except Exception:
+                        pass
                 try:
                     name, result_data = future.result()
                 except Exception as worker_error:
@@ -692,7 +698,10 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
             while remaining_futures:
                 done_futures, remaining_futures = futures_wait(remaining_futures, timeout=0.15)
                 if stream_update_fn:
-                    stream_update_fn()
+                    try:
+                        stream_update_fn()
+                    except Exception:
+                        pass
                 for future in done_futures:
                     try:
                         name, result_data = future.result()
