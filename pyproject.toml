@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 hydra-heads = "hydra_heads.cli:main"
+hh = "hydra_heads.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["hydra_heads*"]
