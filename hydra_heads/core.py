@@ -200,6 +200,10 @@ def _kill_process_group(pid: int, sig: int) -> bool:
 def _force_kill(process, provider_name: str) -> None:
     """SIGTERM with grace period, escalating to SIGKILL. Kills entire process group."""
     if not _kill_process_group(process.pid, signal.SIGTERM):
+        try:
+            process.wait(timeout=1)
+        except Exception:
+            pass
         return
     try:
         process.wait(timeout=SIGTERM_GRACE_PERIOD_SECONDS)
@@ -373,8 +377,6 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
                             new_bytes = log_file.read()
                             if new_bytes:
                                 chunk = new_bytes.decode("utf-8", errors="replace")
-                                if len(chunk) > STREAM_BUFFER_MAX_BYTES // 2:
-                                    chunk = chunk[:STREAM_BUFFER_MAX_BYTES // 2] + "\n...[truncated]"
                                 streaming_buffer.append(chunk)
                                 stdout_position += len(new_bytes)
                 except (FileNotFoundError, OSError):
@@ -387,8 +389,6 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
                             new_bytes = log_file.read()
                             if new_bytes:
                                 chunk = new_bytes.decode("utf-8", errors="replace")
-                                if len(chunk) > STREAM_BUFFER_MAX_BYTES // 2:
-                                    chunk = chunk[:STREAM_BUFFER_MAX_BYTES // 2] + "\n...[truncated]"
                                 streaming_buffer.append(chunk)
                                 stderr_position += len(new_bytes)
                 except (FileNotFoundError, OSError):
@@ -633,12 +633,11 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                     logger.warning(f"{name} worker raised {type(worker_error).__name__}: {worker_error}")
                     result_data = {
                         "response": "", "exit_code": -4, "latency_seconds": 0,
-                        "status": "error", "logs": {},
+                        "status": "error", "logs": {"stdout": "", "stderr": ""},
                     }
                 results[name] = result_data
-                if result_data["exit_code"] != 0 and result_data.get("status") != "aborted":
-                    if not ignore_errors:
-                        failure_summary.append(f"{name}: exit_code={result_data['exit_code']}")
+                if result_data["exit_code"] != 0 and result_data.get("status") != "aborted" and not ignore_errors:
+                    failure_summary.append(f"{name}: exit_code={result_data['exit_code']}")
                     logger.warning(f"{name} failed, aborting remaining providers (--fail-fast)")
                     abort_event.set()
                     with process_lock:
@@ -664,14 +663,14 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                         logger.warning(f"{fname} result collection failed: {type(collection_error).__name__}")
                         results[fname] = {
                             "response": "", "exit_code": -3, "latency_seconds": 0,
-                            "status": "collection_timeout", "logs": {},
+                            "status": "collection_timeout", "logs": {"stdout": "", "stderr": ""},
                         }
                 for future in not_done:
                     fname = futures_map[future]
                     logger.warning(f"{fname} did not complete within collection timeout")
                     results[fname] = {
                         "response": "", "exit_code": -3, "latency_seconds": 0,
-                        "status": "collection_timeout", "logs": {},
+                        "status": "collection_timeout", "logs": {"stdout": "", "stderr": ""},
                     }
         else:
             remaining_futures = set(futures_map.keys())
@@ -687,7 +686,7 @@ def _execute_providers(provider_configs: list, launch_provider_fn, fail_fast: bo
                         logger.warning(f"{name} worker raised {type(worker_error).__name__}: {worker_error}")
                         result_data = {
                             "response": "", "exit_code": -4, "latency_seconds": 0,
-                            "status": "error", "logs": {},
+                            "status": "error", "logs": {"stdout": "", "stderr": ""},
                         }
                     results[name] = result_data
                     if result_data["exit_code"] != 0 and not ignore_errors:
@@ -824,8 +823,11 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             sigint_received[0] = True
             os.write(2, b"hydra-heads: Received SIGINT, aborting all providers...\n")
             abort_event.set()
-            for process_handle in list(running_processes.values()):
+            snapshot = list(running_processes.values())
+            for process_handle in snapshot:
                 _kill_process_group(process_handle.pid, signal.SIGTERM)
+            time.sleep(0.5)
+            for process_handle in snapshot:
                 _kill_process_group(process_handle.pid, signal.SIGKILL)
 
         signal.signal(signal.SIGINT, sigint_handler)
