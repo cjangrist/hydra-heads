@@ -385,6 +385,8 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
                                 stdout_position += len(new_bytes)
                 except (FileNotFoundError, OSError):
                     pass
+                except Exception:
+                    break
                 try:
                     stderr_size = os.path.getsize(stderr_log)
                     if stderr_size < stderr_position:
@@ -399,6 +401,8 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
                                 stderr_position += len(new_bytes)
                 except (FileNotFoundError, OSError):
                     pass
+                except Exception:
+                    break
                 stop_polling.wait(0.15)
 
         poll_thread = threading.Thread(target=poll_log_file, daemon=True)
