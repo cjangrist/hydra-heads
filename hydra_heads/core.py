@@ -169,6 +169,8 @@ def _build_command_args(provider_config: dict, prompt: str, model_override: str 
     if provider_config["prompt_flag"]:
         command_args.extend([provider_config["prompt_flag"], prompt])
     else:
+        if prompt.startswith("-"):
+            command_args.append("--")
         command_args.append(prompt)
     logger.debug(f"_build_command_args result={command_args[:3]}...")
     return command_args
