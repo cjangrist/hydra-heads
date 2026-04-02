@@ -3,7 +3,7 @@
 PROVIDER = {
     "name": "gemini",
     "binary": "gemini",
-    "args": ["-m", "pro", "--yolo"],
+    "args": ["-m", "gemini-3-pro-preview", "--yolo"],
     "prompt_flag": "-p",
     "model_flag": "-m",
     "env": {},
