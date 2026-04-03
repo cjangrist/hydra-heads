@@ -3,7 +3,7 @@
 PROVIDER = {
     "name": "codex",
     "binary": "codex",
-    "args": ["exec", "-m", "gpt-5.4", "-c", "model_reasoning_effort=high", "--yolo"],
+    "args": ["exec", "-m", "gpt-5.4", "-c", "model_reasoning_effort=xhigh", "-c", "service_tier=fast", "--yolo"],
     "prompt_flag": None,
     "model_flag": "-m",
     "env": {},
