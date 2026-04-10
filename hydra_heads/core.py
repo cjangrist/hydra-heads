@@ -1102,6 +1102,7 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
         logger.info(f"Display names: {', '.join(display_names.values())}")
 
         task_directory, folder_name = _prepare_task_directory(log_base_directory, prompt_md5, prompt_title)
+        Path(task_directory, "prompt.md").write_text(prompt, encoding="utf-8")
 
         display_name_list = [display_names[pc["name"]] for pc in provider_configs]
         log_paths = _prepare_log_paths(task_directory, display_name_list)
@@ -1113,7 +1114,6 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             sandbox = _create_agent_sandbox(effective_cwd, folder_name, dname)
             sandbox_paths[pname] = sandbox
             logger.info(f"Agent sandbox [{dname}]: {sandbox}")
-            Path(sandbox, "prompt.md").write_text(prompt, encoding="utf-8")
 
         injected_prompts = {
             pc["name"]: _inject_sandbox_rules(prompt, sandbox_paths[pc["name"]])
@@ -1158,23 +1158,6 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
                 for p in Path(sandbox_paths[name]).rglob("*") if p.is_file()
             )
             result_data["gist"] = _generate_file_gist(sandbox_paths[name])
-
-            response_md_path = Path(sandbox_paths[name]) / "response.md"
-            if response_md_path.is_file() and response_md_path.stat().st_size > 0:
-                try:
-                    response_content = response_md_path.read_text(encoding="utf-8", errors="replace")
-                    response_lines = response_content.split("\n")
-                    preview = {
-                        "size_bytes": response_md_path.stat().st_size,
-                        "token_count": _count_tokens(response_content),
-                        "total_lines": len(response_lines),
-                        "first_25_lines": "\n".join(response_lines[:25]),
-                    }
-                    if len(response_lines) > 50:
-                        preview["tail_25_lines"] = "\n".join(response_lines[-25:])
-                    result_data["response_preview"] = preview
-                except (OSError, IOError):
-                    pass
 
             if streaming_statuses:
                 with streaming_lock:
