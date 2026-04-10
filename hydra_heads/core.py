@@ -1109,9 +1109,10 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
         effective_cwd = working_directory or os.getcwd()
         for provider_config in provider_configs:
             pname = provider_config["name"]
-            sandbox = _create_agent_sandbox(effective_cwd, folder_name, pname)
+            dname = display_names[pname]
+            sandbox = _create_agent_sandbox(effective_cwd, folder_name, dname)
             sandbox_paths[pname] = sandbox
-            logger.info(f"Agent sandbox [{pname}]: {sandbox}")
+            logger.info(f"Agent sandbox [{dname}]: {sandbox}")
             Path(sandbox, "prompt.md").write_text(prompt, encoding="utf-8")
 
         injected_prompts = {
