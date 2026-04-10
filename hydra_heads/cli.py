@@ -74,7 +74,7 @@ def _run_status_check(args: argparse.Namespace) -> None:
     ping_failed_names = set()
     if reachable_configs:
         try:
-            healthy_configs = _preflight_ping(
+            healthy_configs, _latencies = _preflight_ping(
                 reachable_configs, commands, ping_timeout,
             )
             healthy_names = {pc["name"] for pc in healthy_configs}

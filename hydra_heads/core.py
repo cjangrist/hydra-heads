@@ -5,11 +5,12 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import sys
+import tempfile
 import threading
 import time
-import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait as futures_wait
 from datetime import datetime, timezone
@@ -65,6 +66,21 @@ OUTPUT_SCHEMA = {
                         "status": {"type": "string"},
                         "latency_seconds": {"type": "number"},
                         "logs": {"type": "object"},
+                    },
+                },
+            },
+            "sandbox_path": {"type": "string", "description": "Absolute path to the agent's sandbox directory"},
+            "gist": {
+                "type": "array",
+                "description": "File listing from the agent sandbox with sizes, line counts, and head/tail previews",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "size_bytes": {"type": "integer"},
+                        "line_count": {"type": "integer"},
+                        "first_25_lines": {"type": "string"},
+                        "last_25_lines": {"type": "string"},
                     },
                 },
             },
@@ -221,25 +237,25 @@ def _force_kill(process, provider_name: str) -> None:
             logger.warning(f"{provider_name} could not be reaped after SIGKILL: {reap_error}")
 
 
-def _build_task_hash(prompt: str) -> str:
-    """Generate a hash from the prompt for task directory naming."""
-    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+def _build_prompt_md5(prompt: str) -> str:
+    """Generate MD5 hash of the prompt for use as task UUID."""
+    return hashlib.md5(prompt.encode("utf-8")).hexdigest()
 
 
-def _prepare_task_directory(log_base_directory: str, prompt: str) -> str:
-    """Create and return a fully qualified task directory: base/iso_datetime-task_hash-uuid/."""
+def _prepare_task_directory(log_base_directory: str, prompt_md5: str, prompt_title: str) -> tuple:
+    """Create task directory: base/YYYY-MM-DD-HH-MM-SS_md5_title/. Returns (path_str, folder_name)."""
     logger.debug(f"_prepare_task_directory base={log_base_directory}")
-    iso_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")
-    task_hash = _build_task_hash(prompt)
-    unique_suffix = uuid.uuid4().hex[:8]
-    task_directory_name = f"{iso_timestamp}-{task_hash}-{unique_suffix}"
-    task_path = Path(log_base_directory).resolve() / task_directory_name
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H-%M-%S")
+    folder_name = f"{timestamp}_{prompt_md5}_{prompt_title}"
+    task_path = Path(log_base_directory).resolve() / folder_name
     try:
         task_path.mkdir(parents=True, exist_ok=True)
     except OSError as mkdir_error:
         raise HydraError(f"Cannot create log directory {task_path}: {mkdir_error}")
-    logger.debug(f"_prepare_task_directory created {task_path}")
-    return str(task_path)
+    logger.info("=" * 80)
+    logger.info(f"TASK START — LOG DIRECTORY: {task_path}")
+    logger.info("=" * 80)
+    return str(task_path), folder_name
 
 
 def _prepare_log_paths(task_directory: str, provider_names: list) -> dict:
@@ -254,15 +270,178 @@ def _prepare_log_paths(task_directory: str, provider_names: list) -> dict:
     return paths
 
 
+def _fallback_prompt_title(prompt: str) -> str:
+    """Generate a fallback dash-separated title from prompt text. Last resort when no provider succeeds."""
+    words = re.sub(r'[^a-z0-9\s]', '', prompt.lower()).split()[:6]
+    return '-'.join(words) if words else "untitled-task"
+
+
+def _parse_title_response(response: str) -> str:
+    """Parse a title generation response into a clean dash-separated title. Returns empty string on failure."""
+    raw_title = response.strip().split("\n")[0].strip()
+    clean = re.sub(r'[^a-z0-9]+', '-', raw_title.lower()).strip('-')
+    words = [w for w in clean.split('-') if w]
+    if len(words) > 10:
+        words = words[:10]
+    if words:
+        return '-'.join(words)
+    return ""
+
+
+def _generate_prompt_title(provider_configs: list, commands: dict, prompt: str,
+                           timeout_seconds: int = 45,
+                           abort_event: threading.Event = None,
+                           running_processes: dict = None,
+                           process_lock: threading.Lock = None) -> str:
+    """Try providers in order of latency until one produces a usable title. Falls back to word extraction."""
+    title_prompt = (
+        "Generate a 4 to 10 word dash-separated lowercase title for the following task. "
+        "Respond with ONLY the title on a single line. "
+        "No quotes, no explanation, no markdown, no formatting.\n\n"
+        f"{prompt[:2000]}"
+    )
+    for provider_config in provider_configs:
+        name = provider_config["name"]
+        title_dir = tempfile.mkdtemp(prefix="hydra_title_")
+        try:
+            stdout_log = os.path.join(title_dir, "title_stdout.log")
+            stderr_log = os.path.join(title_dir, "title_stderr.log")
+            _result_name, result = _launch_and_collect(
+                commands[name], provider_config, title_prompt,
+                stdout_log, stderr_log,
+                timeout_seconds=timeout_seconds,
+                abort_event=abort_event,
+                running_processes=running_processes,
+                process_lock=process_lock,
+            )
+            if result["status"] == "success" and result["response"]:
+                parsed = _parse_title_response(result["response"])
+                if parsed:
+                    return parsed
+            logger.warning(f"Title generation from {name} returned unusable response, trying next")
+        except Exception as title_error:
+            logger.warning(f"Title generation from {name} failed ({type(title_error).__name__}), trying next")
+        finally:
+            shutil.rmtree(title_dir, ignore_errors=True)
+
+    logger.warning("All providers failed title generation, using word extraction fallback")
+    return _fallback_prompt_title(prompt)
+
+
+def _create_agent_sandbox(effective_cwd: str, folder_name: str, agent_slug: str) -> str:
+    """Create sandbox directory for an agent: <cwd>/tmp/<folder_name>/<agent_slug>/. Returns absolute path."""
+    sandbox_path = Path(effective_cwd) / "tmp" / folder_name / agent_slug
+    sandbox_path.mkdir(parents=True, exist_ok=True)
+    logger.debug(f"Created agent sandbox: {sandbox_path}")
+    return str(sandbox_path.resolve())
+
+
+def _inject_sandbox_rules(prompt: str, sandbox_path: str) -> str:
+    """Prepend sandboxing rules to the prompt so the agent writes only to its sandbox directory."""
+    rules = (
+        "[CRITICAL RULES]\n"
+        f"1. You MUST NOT create, modify, or delete ANY files outside of: {sandbox_path}\n"
+        f"2. Write your final response/output to: {sandbox_path}/response.md "
+        "(this file does NOT exist yet — you MUST create it yourself)\n"
+        f"3. You may create, write, and execute any additional files needed to complete the task, "
+        f"but ALL files MUST be written ONLY within: {sandbox_path}/\n"
+        "4. Do NOT modify the original codebase or any files outside your designated sandbox directory.\n"
+        "5. NEVER run code inline or pass code directly to a shell command. "
+        "ALWAYS write code to a file in your sandbox first, then execute that file. "
+        "Shell escaping is error-prone — writing to a file avoids it entirely.\n"
+        "6. NEVER use rm or delete files. If cleanup is needed, move files to a trash/ subdirectory within your sandbox.\n"
+        "7. NEVER pipe command output through head, tail, or other truncation filters. Always capture full output.\n"
+        "8. Number your files (01-foo.py, 02-bar.sh, etc.). When iterating on a file, "
+        "cp it to a new numbered version (e.g. cp 01-foo.py 02-foo.py) before editing. "
+        "Prefer small surgical edits over massive rewrites.\n"
+        "9. For any Python work, use these exact paths: "
+        "python=~/anaconda3/bin/python, pip=~/anaconda3/bin/pip. "
+        "Always add a shebang line at the top of executable files (e.g. #!/usr/bin/env python3).\n"
+        "[END RULES]\n\n"
+    )
+    return rules + prompt
+
+
+def _copy_agent_logs(source_stdout: str, source_stderr: str, sandbox_path: str) -> dict:
+    """Copy agent log files to <sandbox>/logs/. Returns dict with new stdout/stderr paths."""
+    logs_dir = Path(sandbox_path) / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    new_stdout = str(logs_dir / "stdout.log")
+    new_stderr = str(logs_dir / "stderr.log")
+    for src, dst in [(source_stdout, new_stdout), (source_stderr, new_stderr)]:
+        try:
+            if Path(src).is_file():
+                shutil.copy2(src, dst)
+        except (OSError, IOError) as copy_error:
+            logger.warning(f"Failed to copy log {src} -> {dst}: {copy_error}")
+    return {"stdout": new_stdout, "stderr": new_stderr}
+
+
+def _generate_file_gist(directory: str) -> list:
+    """Generate structured gist of all files in a directory tree for LLM consumption."""
+    gist_entries = []
+    dir_path = Path(directory)
+    if not dir_path.is_dir():
+        return gist_entries
+    for file_path in sorted(dir_path.rglob("*")):
+        if not file_path.is_file():
+            continue
+        relative_path = str(file_path.relative_to(dir_path))
+        try:
+            size_bytes = file_path.stat().st_size
+            content = file_path.read_text(encoding="utf-8", errors="replace")
+            lines = content.split("\n")
+            line_count = len(lines)
+            first_25 = "\n".join(lines[:25])
+            last_25 = "\n".join(lines[-25:]) if line_count > 25 else ""
+            gist_entries.append({
+                "path": relative_path,
+                "size_bytes": size_bytes,
+                "line_count": line_count,
+                "first_25_lines": first_25,
+                "last_25_lines": last_25,
+            })
+        except Exception as read_error:
+            gist_entries.append({
+                "path": relative_path,
+                "size_bytes": 0,
+                "line_count": 0,
+                "first_25_lines": f"[Error reading file: {read_error}]",
+                "last_25_lines": "",
+            })
+    return gist_entries
+
+
+def _log_task_end_summary(task_directory: str, sandbox_paths: dict, results: dict) -> None:
+    """Log prominent end-of-task summary with file listings for each provider sandbox."""
+    logger.info("=" * 80)
+    logger.info(f"TASK END — LOG DIRECTORY: {task_directory}")
+    logger.info("=" * 80)
+    for provider_name, sandbox_path in sandbox_paths.items():
+        display_key = None
+        for key in results:
+            if key.startswith(provider_name) or provider_name in key:
+                display_key = key
+                break
+        label = display_key or provider_name
+        gist = results.get(label, {}).get("gist", [])
+        logger.info(f"--- {label} sandbox: {sandbox_path} ---")
+        for entry in gist:
+            logger.info(f"  {entry['path']}  ({entry['size_bytes']} bytes, {entry['line_count']} lines)")
+            if entry["first_25_lines"]:
+                for line in entry["first_25_lines"].split("\n")[:5]:
+                    logger.info(f"    | {line}")
+                if entry["line_count"] > 5:
+                    logger.info(f"    | ... ({entry['line_count']} total lines)")
+    logger.info("=" * 80)
+
+
 def _preflight_ping(provider_configs: list, commands: dict,
                     ping_timeout: int = PREFLIGHT_PING_TIMEOUT_SECONDS,
                     abort_event: threading.Event = None,
                     running_processes: dict = None,
-                    process_lock: threading.Lock = None) -> list:
-    """Run a quick ping prompt against all providers to verify they're responsive. Returns list of healthy configs."""
-    import shutil
-    import tempfile
-
+                    process_lock: threading.Lock = None) -> tuple:
+    """Run a quick ping against all providers. Returns (healthy_configs, latency_dict)."""
     logger.info(f"Preflight ping: testing {len(provider_configs)} providers (timeout={ping_timeout}s)")
     ping_directory = tempfile.mkdtemp(prefix="hydra_ping_")
 
@@ -303,11 +482,13 @@ def _preflight_ping(provider_configs: list, commands: dict,
 
         healthy_providers = []
         failed_providers = []
+        ping_latencies = {}
         for provider_config in provider_configs:
             name = provider_config["name"]
             result = ping_results.get(name, {})
             status = result.get("status", "unknown")
             latency = result.get("latency_seconds", 0)
+            ping_latencies[name] = latency
             if status == "success":
                 logger.info(f"Preflight OK: {name} ({latency}s)")
                 healthy_providers.append(provider_config)
@@ -321,7 +502,7 @@ def _preflight_ping(provider_configs: list, commands: dict,
         if not healthy_providers:
             raise HydraError("All providers failed preflight ping — nothing to run")
 
-        return healthy_providers
+        return healthy_providers, ping_latencies
     finally:
         try:
             shutil.rmtree(ping_directory)
@@ -847,11 +1028,6 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
         sigint_received = [False]
 
         def sigint_handler(signum, frame):
-            # DESIGN: No lock acquisition here. Signal handlers run between bytecodes on the
-            # main thread. Acquiring process_lock would deadlock if a worker thread holds it.
-            # list(dict.values()) is GIL-atomic in CPython. Sending SIGTERM to a stale PID is
-            # harmless (_kill_process_group catches ProcessLookupError). The abort_event causes
-            # worker threads to do proper cleanup via _force_kill with SIGKILL escalation.
             if sigint_received[0]:
                 os.write(2, b"hydra-heads: Second SIGINT, force exiting\n")
                 signal.signal(signal.SIGINT, original_sigint_handler)
@@ -864,14 +1040,36 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
 
         signal.signal(signal.SIGINT, sigint_handler)
 
+    sandbox_paths = {}
+
     try:
+        ping_latencies = {}
         if preflight and provider_configs:
-            provider_configs = _preflight_ping(
+            provider_configs, ping_latencies = _preflight_ping(
                 provider_configs, commands, ping_timeout,
                 abort_event=abort_event, running_processes=running_processes,
                 process_lock=process_lock,
             )
             provider_names = [pc["name"] for pc in provider_configs]
+
+        prompt_md5 = _build_prompt_md5(prompt)
+
+        prompt_title = _fallback_prompt_title(prompt)
+        if ping_latencies:
+            healthy_names = {pc["name"] for pc in provider_configs}
+            healthy_latencies = {k: v for k, v in ping_latencies.items() if k in healthy_names and v > 0}
+            if healthy_latencies:
+                sorted_by_speed = sorted(healthy_latencies, key=healthy_latencies.get)
+                sorted_configs = [next(pc for pc in provider_configs if pc["name"] == n) for n in sorted_by_speed]
+                logger.info(f"Title generation order (by latency): {', '.join(sorted_by_speed)}")
+                prompt_title = _generate_prompt_title(
+                    sorted_configs, commands, prompt,
+                    timeout_seconds=45,
+                    abort_event=abort_event,
+                    running_processes=running_processes,
+                    process_lock=process_lock,
+                )
+                logger.info(f"Generated prompt title: {prompt_title}")
 
         display_names = {}
         for provider_config in provider_configs:
@@ -881,9 +1079,22 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             display_names[pname] = _make_display_name(pname, detected_model)
         logger.info(f"Display names: {', '.join(display_names.values())}")
 
+        task_directory, folder_name = _prepare_task_directory(log_base_directory, prompt_md5, prompt_title)
+
         display_name_list = [display_names[pc["name"]] for pc in provider_configs]
-        task_directory = _prepare_task_directory(log_base_directory, prompt)
         log_paths = _prepare_log_paths(task_directory, display_name_list)
+
+        effective_cwd = working_directory or os.getcwd()
+        for provider_config in provider_configs:
+            pname = provider_config["name"]
+            sandbox = _create_agent_sandbox(effective_cwd, folder_name, pname)
+            sandbox_paths[pname] = sandbox
+            logger.info(f"Agent sandbox [{pname}]: {sandbox}")
+
+        injected_prompts = {
+            pc["name"]: _inject_sandbox_rules(prompt, sandbox_paths[pc["name"]])
+            for pc in provider_configs
+        }
 
         streaming_buffers = {display_names[pc["name"]]: deque(maxlen=STREAM_BUFFER_MAX_CHUNKS) for pc in provider_configs} if stream else None
         streaming_statuses = {display_names[pc["name"]]: "pending" for pc in provider_configs} if stream else None
@@ -900,14 +1111,25 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
                     streaming_statuses[dname] = "running"
 
             provider_model_override = (model_overrides or {}).get(name)
+            agent_prompt = injected_prompts[name]
+
             result_name, result_data = _retry_launch_and_collect(
-                commands[name], provider_config, prompt,
+                commands[name], provider_config, agent_prompt,
                 log_paths[f"{dname}_stdout"], log_paths[f"{dname}_stderr"],
                 timeout_seconds=timeout_seconds, working_directory=working_directory,
                 streaming_buffer=buffer, abort_event=abort_event,
                 running_processes=running_processes, process_lock=process_lock,
                 max_retries=retries, model_override=provider_model_override,
             )
+
+            sandbox_log_paths = _copy_agent_logs(
+                result_data["logs"]["stdout"],
+                result_data["logs"]["stderr"],
+                sandbox_paths[name],
+            )
+            result_data["logs"] = sandbox_log_paths
+            result_data["sandbox_path"] = sandbox_paths[name]
+            result_data["gist"] = _generate_file_gist(sandbox_paths[name])
 
             if streaming_statuses:
                 with streaming_lock:
@@ -950,6 +1172,8 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
 
     if failure_summary and not ignore_errors:
         logger.warning(f"Provider failures: {'; '.join(failure_summary)}")
+
+    _log_task_end_summary(task_directory, sandbox_paths, results)
 
     logger.info("All providers completed")
     logger.debug(f"run_hydra returning {len(results)} results")
