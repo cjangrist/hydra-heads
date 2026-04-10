@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import coloredlogs
+import tiktoken
 from dotenv import load_dotenv
 from sh import Command, CommandNotFound, TimeoutException
 
@@ -33,6 +34,12 @@ SIGTERM_GRACE_PERIOD_SECONDS = 5
 WAIT_POLL_INTERVAL_SECONDS = 0.5
 STREAM_BUFFER_MAX_CHUNKS = 500
 STREAM_PANEL_HEIGHT = 6
+TIKTOKEN_ENCODING = tiktoken.get_encoding("cl100k_base")
+
+
+def _count_tokens(text: str) -> int:
+    """Count tokens in text using cl100k_base encoding."""
+    return len(TIKTOKEN_ENCODING.encode(text))
 
 logger = logging.getLogger("hydra_heads")
 
@@ -362,8 +369,20 @@ def _inject_sandbox_rules(prompt: str, sandbox_path: str) -> str:
     return rules + prompt
 
 
+def _file_stats(file_path: str) -> dict:
+    """Return size_bytes and token_count for a file. Returns zeros on error."""
+    try:
+        path = Path(file_path)
+        if path.is_file():
+            content = path.read_text(encoding="utf-8", errors="replace")
+            return {"size_bytes": path.stat().st_size, "token_count": _count_tokens(content)}
+    except (OSError, IOError):
+        pass
+    return {"size_bytes": 0, "token_count": 0}
+
+
 def _copy_agent_logs(source_stdout: str, source_stderr: str, sandbox_path: str) -> dict:
-    """Copy agent log files to <sandbox>/logs/. Returns dict with new stdout/stderr paths."""
+    """Copy agent log files to <sandbox>/logs/. Returns dict with paths, sizes, and token counts."""
     logs_dir = Path(sandbox_path) / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     new_stdout = str(logs_dir / "stdout.log")
@@ -374,7 +393,10 @@ def _copy_agent_logs(source_stdout: str, source_stderr: str, sandbox_path: str) 
                 shutil.copy2(src, dst)
         except (OSError, IOError) as copy_error:
             logger.warning(f"Failed to copy log {src} -> {dst}: {copy_error}")
-    return {"stdout": new_stdout, "stderr": new_stderr}
+    return {
+        "stdout": {"path": new_stdout, **_file_stats(new_stdout)},
+        "stderr": {"path": new_stderr, **_file_stats(new_stderr)},
+    }
 
 
 def _generate_file_gist(directory: str) -> list:
@@ -386,7 +408,7 @@ def _generate_file_gist(directory: str) -> list:
     for file_path in sorted(dir_path.rglob("*")):
         if not file_path.is_file():
             continue
-        relative_path = str(file_path.relative_to(dir_path))
+        fully_qualified_path = str(file_path.resolve())
         try:
             size_bytes = file_path.stat().st_size
             content = file_path.read_text(encoding="utf-8", errors="replace")
@@ -395,15 +417,16 @@ def _generate_file_gist(directory: str) -> list:
             first_25 = "\n".join(lines[:25])
             last_25 = "\n".join(lines[-25:]) if line_count > 25 else ""
             gist_entries.append({
-                "path": relative_path,
+                "path": fully_qualified_path,
                 "size_bytes": size_bytes,
                 "line_count": line_count,
+                "token_count": _count_tokens(content),
                 "first_25_lines": first_25,
                 "last_25_lines": last_25,
             })
         except Exception as read_error:
             gist_entries.append({
-                "path": relative_path,
+                "path": fully_qualified_path,
                 "size_bytes": 0,
                 "line_count": 0,
                 "first_25_lines": f"[Error reading file: {read_error}]",
@@ -1129,7 +1152,26 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             )
             result_data["logs"] = sandbox_log_paths
             result_data["sandbox_path"] = sandbox_paths[name]
+            result_data["sandbox_files"] = sorted(
+                str(p.resolve())
+                for p in Path(sandbox_paths[name]).rglob("*") if p.is_file()
+            )
             result_data["gist"] = _generate_file_gist(sandbox_paths[name])
+
+            response_md_path = Path(sandbox_paths[name]) / "response.md"
+            if response_md_path.is_file():
+                try:
+                    response_content = response_md_path.read_text(encoding="utf-8", errors="replace")
+                    response_lines = response_content.split("\n")
+                    result_data["response_preview"] = {
+                        "first_lines": "\n".join(response_lines[:5]),
+                        "last_lines": "\n".join(response_lines[-5:]) if len(response_lines) > 5 else "",
+                        "total_lines": len(response_lines),
+                        "size_bytes": response_md_path.stat().st_size,
+                        "token_count": _count_tokens(response_content),
+                    }
+                except (OSError, IOError):
+                    pass
 
             if streaming_statuses:
                 with streaming_lock:
