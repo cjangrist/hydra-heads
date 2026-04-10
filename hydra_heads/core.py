@@ -445,12 +445,16 @@ def _log_task_end_summary(task_directory: str, sandbox_paths: dict, results: dic
         gist = results.get(label, {}).get("gist", [])
         logger.info(f"--- {label} sandbox: {sandbox_path} ---")
         for entry in gist:
-            logger.info(f"  {entry['path']}  ({entry['size_bytes']} bytes, {entry['line_count']} lines)")
-            if entry["first_25_lines"]:
-                for line in entry["first_25_lines"].split("\n")[:5]:
+            size = entry['size_bytes']
+            line_count = entry.get('line_count')
+            stats = f"{size} bytes" + (f", {line_count} lines" if line_count else "")
+            logger.info(f"  {entry['path']}  ({stats})")
+            first_lines = entry.get("first_25_lines", "")
+            if first_lines:
+                for line in first_lines.split("\n")[:5]:
                     logger.info(f"    | {line}")
-                if entry["line_count"] > 5:
-                    logger.info(f"    | ... ({entry['line_count']} total lines)")
+                if line_count and line_count > 5:
+                    logger.info(f"    | ... ({line_count} total lines)")
     logger.info("=" * 80)
 
 
@@ -1108,6 +1112,7 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             sandbox = _create_agent_sandbox(effective_cwd, folder_name, pname)
             sandbox_paths[pname] = sandbox
             logger.info(f"Agent sandbox [{pname}]: {sandbox}")
+            Path(sandbox, "prompt.md").write_text(prompt, encoding="utf-8")
 
         injected_prompts = {
             pc["name"]: _inject_sandbox_rules(prompt, sandbox_paths[pc["name"]])
