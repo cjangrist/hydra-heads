@@ -411,26 +411,21 @@ def _generate_file_gist(directory: str) -> list:
         fully_qualified_path = str(file_path.resolve())
         try:
             size_bytes = file_path.stat().st_size
-            content = file_path.read_text(encoding="utf-8", errors="replace")
-            lines = content.split("\n")
-            line_count = len(lines)
-            first_25 = "\n".join(lines[:25])
-            last_25 = "\n".join(lines[-25:]) if line_count > 25 else ""
-            gist_entries.append({
-                "path": fully_qualified_path,
-                "size_bytes": size_bytes,
-                "line_count": line_count,
-                "token_count": _count_tokens(content),
-                "first_25_lines": first_25,
-                "last_25_lines": last_25,
-            })
+            entry = {"path": fully_qualified_path, "size_bytes": size_bytes}
+            if size_bytes > 0:
+                content = file_path.read_text(encoding="utf-8", errors="replace")
+                lines = content.split("\n")
+                entry["line_count"] = len(lines)
+                entry["token_count"] = _count_tokens(content)
+                entry["first_25_lines"] = "\n".join(lines[:25])
+                if len(lines) > 25:
+                    entry["last_25_lines"] = "\n".join(lines[-25:])
+            gist_entries.append(entry)
         except Exception as read_error:
             gist_entries.append({
                 "path": fully_qualified_path,
                 "size_bytes": 0,
-                "line_count": 0,
-                "first_25_lines": f"[Error reading file: {read_error}]",
-                "last_25_lines": "",
+                "error": str(read_error),
             })
     return gist_entries
 
@@ -1159,17 +1154,19 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             result_data["gist"] = _generate_file_gist(sandbox_paths[name])
 
             response_md_path = Path(sandbox_paths[name]) / "response.md"
-            if response_md_path.is_file():
+            if response_md_path.is_file() and response_md_path.stat().st_size > 0:
                 try:
                     response_content = response_md_path.read_text(encoding="utf-8", errors="replace")
                     response_lines = response_content.split("\n")
-                    result_data["response_preview"] = {
-                        "first_lines": "\n".join(response_lines[:5]),
-                        "last_lines": "\n".join(response_lines[-5:]) if len(response_lines) > 5 else "",
-                        "total_lines": len(response_lines),
+                    preview = {
                         "size_bytes": response_md_path.stat().st_size,
                         "token_count": _count_tokens(response_content),
+                        "total_lines": len(response_lines),
+                        "first_lines": "\n".join(response_lines[:5]),
                     }
+                    if len(response_lines) > 5:
+                        preview["last_lines"] = "\n".join(response_lines[-5:])
+                    result_data["response_preview"] = preview
                 except (OSError, IOError):
                     pass
 
