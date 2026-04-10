@@ -430,31 +430,16 @@ def _generate_file_gist(directory: str) -> list:
     return gist_entries
 
 
-def _log_task_end_summary(task_directory: str, sandbox_paths: dict, results: dict) -> None:
-    """Log prominent end-of-task summary with file listings for each provider sandbox."""
+def _log_task_end_summary(task_directory: str, sandbox_paths: dict) -> None:
+    """Log end-of-task sandbox tree listing."""
     logger.info("=" * 80)
     logger.info(f"TASK END — LOG DIRECTORY: {task_directory}")
     logger.info("=" * 80)
     for provider_name, sandbox_path in sandbox_paths.items():
-        display_key = None
-        for key in results:
-            if key.startswith(provider_name) or provider_name in key:
-                display_key = key
-                break
-        label = display_key or provider_name
-        gist = results.get(label, {}).get("gist", [])
-        logger.info(f"--- {label} sandbox: {sandbox_path} ---")
-        for entry in gist:
-            size = entry['size_bytes']
-            line_count = entry.get('line_count')
-            stats = f"{size} bytes" + (f", {line_count} lines" if line_count else "")
-            logger.info(f"  {entry['path']}  ({stats})")
-            first_lines = entry.get("first_25_lines", "")
-            if first_lines:
-                for line in first_lines.split("\n")[:5]:
-                    logger.info(f"    | {line}")
-                if line_count and line_count > 5:
-                    logger.info(f"    | ... ({line_count} total lines)")
+        logger.info(f"--- {provider_name}: {sandbox_path} ---")
+        for file_path in sorted(Path(sandbox_path).rglob("*")):
+            if file_path.is_file():
+                logger.info(f"  {file_path.resolve()}")
     logger.info("=" * 80)
 
 
@@ -1114,6 +1099,8 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             sandbox = _create_agent_sandbox(effective_cwd, folder_name, dname)
             sandbox_paths[pname] = sandbox
             logger.info(f"Agent sandbox [{dname}]: {sandbox}")
+            start_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+            Path(sandbox, f"task_started_at__{start_ts}.txt").touch()
 
         injected_prompts = {
             pc["name"]: _inject_sandbox_rules(prompt, sandbox_paths[pc["name"]])
@@ -1153,6 +1140,12 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             )
             result_data["logs"] = sandbox_log_paths
             result_data["sandbox_path"] = sandbox_paths[name]
+
+            finish_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+            exit_code = result_data.get("exit_code", -4)
+            Path(sandbox_paths[name], f"task_finished_at__{finish_ts}.txt").touch()
+            Path(sandbox_paths[name], f"task_exit_code__{exit_code}.txt").touch()
+
             result_data["sandbox_files"] = sorted(
                 str(p.resolve())
                 for p in Path(sandbox_paths[name]).rglob("*") if p.is_file()
@@ -1201,7 +1194,7 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
     if failure_summary and not ignore_errors:
         logger.warning(f"Provider failures: {'; '.join(failure_summary)}")
 
-    _log_task_end_summary(task_directory, sandbox_paths, results)
+    _log_task_end_summary(task_directory, sandbox_paths)
 
     logger.info("All providers completed")
     logger.debug(f"run_hydra returning {len(results)} results")
