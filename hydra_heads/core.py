@@ -245,8 +245,8 @@ def _force_kill(process, provider_name: str) -> None:
 
 
 def _build_prompt_md5(prompt: str) -> str:
-    """Generate MD5 hash of the prompt for use as task UUID."""
-    return hashlib.md5(prompt.encode("utf-8")).hexdigest()
+    """Generate 7-char MD5 hash of the prompt, same length as a git short hash. Deterministic."""
+    return hashlib.md5(prompt.encode("utf-8")).hexdigest()[:7]
 
 
 def _prepare_task_directory(log_base_directory: str, prompt_md5: str, prompt_title: str) -> tuple:
