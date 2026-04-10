@@ -58,8 +58,22 @@ OUTPUT_SCHEMA = {
             "logs": {
                 "type": "object",
                 "properties": {
-                    "stdout": {"type": "string", "description": "Path to stdout log file"},
-                    "stderr": {"type": "string", "description": "Path to stderr log file"},
+                    "stdout": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Absolute path to stdout log file"},
+                            "size_bytes": {"type": "integer"},
+                            "token_count": {"type": "integer"},
+                        },
+                    },
+                    "stderr": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string", "description": "Absolute path to stderr log file"},
+                            "size_bytes": {"type": "integer"},
+                            "token_count": {"type": "integer"},
+                        },
+                    },
                 },
             },
             "attempts": {
@@ -77,15 +91,21 @@ OUTPUT_SCHEMA = {
                 },
             },
             "sandbox_path": {"type": "string", "description": "Absolute path to the agent's sandbox directory"},
+            "sandbox_files": {
+                "type": "array",
+                "description": "Sorted list of absolute paths to all files in the agent sandbox",
+                "items": {"type": "string"},
+            },
             "gist": {
                 "type": "array",
-                "description": "File listing from the agent sandbox with sizes, line counts, and head/tail previews",
+                "description": "File listing from the agent sandbox with sizes, token counts, and head/tail previews",
                 "items": {
                     "type": "object",
                     "properties": {
                         "path": {"type": "string"},
                         "size_bytes": {"type": "integer"},
                         "line_count": {"type": "integer"},
+                        "token_count": {"type": "integer"},
                         "first_25_lines": {"type": "string"},
                         "tail_25_lines": {"type": "string"},
                     },
