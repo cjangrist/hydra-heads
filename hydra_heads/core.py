@@ -87,7 +87,7 @@ OUTPUT_SCHEMA = {
                         "size_bytes": {"type": "integer"},
                         "line_count": {"type": "integer"},
                         "first_25_lines": {"type": "string"},
-                        "last_25_lines": {"type": "string"},
+                        "tail_25_lines": {"type": "string"},
                     },
                 },
             },
@@ -418,8 +418,8 @@ def _generate_file_gist(directory: str) -> list:
                 entry["line_count"] = len(lines)
                 entry["token_count"] = _count_tokens(content)
                 entry["first_25_lines"] = "\n".join(lines[:25])
-                if len(lines) > 25:
-                    entry["last_25_lines"] = "\n".join(lines[-25:])
+                if len(lines) > 50:
+                    entry["tail_25_lines"] = "\n".join(lines[-25:])
             gist_entries.append(entry)
         except Exception as read_error:
             gist_entries.append({
@@ -1167,10 +1167,10 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
                         "size_bytes": response_md_path.stat().st_size,
                         "token_count": _count_tokens(response_content),
                         "total_lines": len(response_lines),
-                        "first_lines": "\n".join(response_lines[:5]),
+                        "first_25_lines": "\n".join(response_lines[:25]),
                     }
-                    if len(response_lines) > 5:
-                        preview["last_lines"] = "\n".join(response_lines[-5:])
+                    if len(response_lines) > 50:
+                        preview["tail_25_lines"] = "\n".join(response_lines[-25:])
                     result_data["response_preview"] = preview
                 except (OSError, IOError):
                     pass
