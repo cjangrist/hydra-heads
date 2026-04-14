@@ -28,7 +28,7 @@ set -eo pipefail
 # Edit these if your install sources differ.
 
 PROVIDER_DEFS="\
-claude|npm|@anthropic-ai/claude-code
+claude|custom|claude update
 cline|npm|cline
 codex|npm|@openai/codex
 droid|npm|@factory/cli
