@@ -20,5 +20,8 @@ dependencies = [
 hydra-heads = "hydra_heads.cli:main"
 hh = "hydra_heads.cli:main"
 
+[tool.setuptools]
+script-files = ["bin/update-agents"]
+
 [tool.setuptools.packages.find]
 include = ["hydra_heads*"]
