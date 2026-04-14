@@ -4,12 +4,10 @@
 #
 # Provider → Binary mapping (from repo):
 #   claude.py   → claude   (Claude Code)
-#   cline.py    → cline    (Cline CLI)
 #   codex.py    → codex    (Codex CLI)
 #   factory.py  → droid    (Factory Droid)
 #   gemini.py   → gemini   (Gemini CLI)
 #   kilo.py     → kilo     (Kilo Code)
-#   forge.py    → forge    (ForgeCode)
 #   kimi.py     → kimi     (Kimi Code)
 #   ob1.py      → ob1      (OB-1)
 #   opencode.py → opencode (OpenCode)
@@ -31,10 +29,8 @@ set -eo pipefail
 
 PROVIDER_DEFS="\
 claude|custom|claude update
-cline|npm|cline
 codex|npm|@openai/codex
 droid|npm|@factory/cli
-forge|custom|forge update
 gemini|npm|@google/gemini-cli
 kilo|npm|@kilocode/cli
 kimi|custom|uv tool upgrade kimi-cli
