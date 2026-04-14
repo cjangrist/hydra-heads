@@ -40,7 +40,7 @@ kilo|npm|@kilocode/cli
 kimi|custom|uv tool upgrade kimi-cli
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
 opencode|custom|curl -fsSL https://opencode.ai/install | bash
-openhands|pip|openhands"
+openhands|custom|uv tool upgrade openhands"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
