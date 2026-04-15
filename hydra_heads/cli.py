@@ -131,7 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
     default_providers = os.getenv("HYDRA_PROVIDERS", ",".join(available))
     default_timeout = _safe_int_env("HYDRA_TIMEOUT", 1800, minimum=1)
     default_retries = _safe_int_env("HYDRA_RETRIES", 0, minimum=0)
-    default_ping_timeout = _safe_int_env("HYDRA_PING_TIMEOUT", 20, minimum=1)
+    default_ping_timeout = _safe_int_env("HYDRA_PING_TIMEOUT", 35, minimum=1)
     default_cwd = os.getenv("HYDRA_CWD")
 
     parser.add_argument("--providers", default=default_providers,
