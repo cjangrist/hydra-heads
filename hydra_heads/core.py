@@ -425,8 +425,11 @@ def _generate_file_gist(directory: str) -> list:
     dir_path = Path(directory)
     if not dir_path.is_dir():
         return gist_entries
+    marker_prefixes = ("task_started_at__", "task_finished_at__", "task_exit_code__")
     for file_path in sorted(dir_path.rglob("*")):
         if not file_path.is_file():
+            continue
+        if any(file_path.name.startswith(pfx) for pfx in marker_prefixes):
             continue
         fully_qualified_path = str(file_path.resolve())
         try:
@@ -1159,16 +1162,23 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
                 sandbox_paths[name],
             )
             result_data["logs"] = sandbox_log_paths
-            result_data["sandbox_path"] = sandbox_paths[name]
+
+            single_attempt = len(result_data.get("attempts", [])) <= 1
+            if single_attempt:
+                result_data.pop("attempts", None)
+            else:
+                result_data["sandbox_path"] = sandbox_paths[name]
 
             finish_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
             exit_code = result_data.get("exit_code", -4)
             Path(sandbox_paths[name], f"task_finished_at__{finish_ts}.txt").touch()
             Path(sandbox_paths[name], f"task_exit_code__{exit_code}.txt").touch()
 
+            _MARKER_PREFIXES = ("task_started_at__", "task_finished_at__", "task_exit_code__")
             result_data["sandbox_files"] = sorted(
                 str(p.resolve())
-                for p in Path(sandbox_paths[name]).rglob("*") if p.is_file()
+                for p in Path(sandbox_paths[name]).rglob("*")
+                if p.is_file() and not any(p.name.startswith(pfx) for pfx in _MARKER_PREFIXES)
             )
             result_data["gist"] = _generate_file_gist(sandbox_paths[name])
 
