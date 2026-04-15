@@ -28,7 +28,7 @@ load_dotenv()
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 LOG_BASE_DIR = os.getenv("HYDRA_LOG_DIR", str(Path.home() / ".hydra" / "tasks"))
 MAX_PROMPT_ARG_BYTES = 131072
-DEFAULT_TIMEOUT_SECONDS = 1800
+DEFAULT_TIMEOUT_SECONDS = 2700
 DEFAULT_RETRIES = 0
 PREFLIGHT_PING_PROMPT = "respond with just the word pong"
 PREFLIGHT_PING_TIMEOUT_SECONDS = 35
@@ -454,6 +454,28 @@ def _generate_file_gist(directory: str) -> list:
                 "error": str(read_error),
             })
     return gist_entries
+
+
+def _prune_empty_files(result_data: dict) -> None:
+    """Delete empty stdout/stderr/response files and remove them from JSON output."""
+    logs = result_data.get("logs", {})
+    for key in list(logs.keys()):
+        entry = logs[key]
+        file_path = Path(entry.get("path", ""))
+        if file_path.is_file() and file_path.stat().st_size == 0:
+            file_path.unlink()
+            del logs[key]
+
+    sandbox_files = result_data.get("sandbox_files", [])
+    result_data["sandbox_files"] = [
+        f for f in sandbox_files if Path(f).is_file()
+    ]
+
+    gist = result_data.get("gist", [])
+    result_data["gist"] = [
+        entry for entry in gist
+        if Path(entry.get("path", "")).is_file()
+    ]
 
 
 def _log_task_end_summary(task_directory: str, sandbox_paths: dict) -> None:
@@ -1226,6 +1248,9 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
 
     if failure_summary and not ignore_errors:
         logger.warning(f"Provider failures: {'; '.join(failure_summary)}")
+
+    for _dname, result_data in results.items():
+        _prune_empty_files(result_data)
 
     _log_task_end_summary(task_directory, sandbox_paths)
 
