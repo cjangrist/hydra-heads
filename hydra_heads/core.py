@@ -395,10 +395,11 @@ def _file_stats(file_path: str) -> dict:
         path = Path(file_path)
         if path.is_file():
             content = path.read_text(encoding="utf-8", errors="replace")
-            return {"size_bytes": path.stat().st_size, "token_count": _count_tokens(content)}
+            line_count = content.count("\n") + (1 if content and not content.endswith("\n") else 0)
+            return {"size_bytes": path.stat().st_size, "line_count": line_count, "token_count": _count_tokens(content)}
     except (OSError, IOError):
         pass
-    return {"size_bytes": 0, "token_count": 0}
+    return {"size_bytes": 0, "line_count": 0, "token_count": 0}
 
 
 def _copy_agent_logs(source_stdout: str, source_stderr: str, sandbox_path: str) -> dict:
