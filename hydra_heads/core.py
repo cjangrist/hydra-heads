@@ -28,6 +28,8 @@ load_dotenv()
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 LOG_BASE_DIR = os.getenv("HYDRA_LOG_DIR", str(Path.home() / ".hydra" / "tasks"))
 MAX_PROMPT_ARG_BYTES = 131072
+DEFAULT_TIMEOUT_SECONDS = 1800
+DEFAULT_RETRIES = 0
 PREFLIGHT_PING_PROMPT = "respond with just the word pong"
 PREFLIGHT_PING_TIMEOUT_SECONDS = 35
 SIGTERM_GRACE_PERIOD_SECONDS = 5

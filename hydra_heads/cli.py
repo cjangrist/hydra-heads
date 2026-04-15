@@ -10,7 +10,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-LOG_BASE_DIR = os.getenv("HYDRA_LOG_DIR", str(Path.home() / ".hydra" / "tasks"))
+from hydra_heads.core import (
+    DEFAULT_RETRIES,
+    DEFAULT_TIMEOUT_SECONDS,
+    LOG_BASE_DIR,
+    PREFLIGHT_PING_TIMEOUT_SECONDS,
+)
 
 
 def _resolve_prompt(args: argparse.Namespace) -> str:
@@ -52,7 +57,6 @@ def _run_status_check(args: argparse.Namespace) -> None:
     """Ping all providers and display health status table."""
     from hydra_heads.core import (
         HydraError, _preflight_ping, _resolve_command,
-        PREFLIGHT_PING_TIMEOUT_SECONDS,
     )
     from hydra_heads.providers import get_provider, list_providers
 
@@ -129,9 +133,9 @@ def build_parser() -> argparse.ArgumentParser:
         return parsed_value
 
     default_providers = os.getenv("HYDRA_PROVIDERS", ",".join(available))
-    default_timeout = _safe_int_env("HYDRA_TIMEOUT", 1800, minimum=1)
-    default_retries = _safe_int_env("HYDRA_RETRIES", 0, minimum=0)
-    default_ping_timeout = _safe_int_env("HYDRA_PING_TIMEOUT", 35, minimum=1)
+    default_timeout = _safe_int_env("HYDRA_TIMEOUT", DEFAULT_TIMEOUT_SECONDS, minimum=1)
+    default_retries = _safe_int_env("HYDRA_RETRIES", DEFAULT_RETRIES, minimum=0)
+    default_ping_timeout = _safe_int_env("HYDRA_PING_TIMEOUT", PREFLIGHT_PING_TIMEOUT_SECONDS, minimum=1)
     default_cwd = os.getenv("HYDRA_CWD")
 
     parser.add_argument("--providers", default=default_providers,
