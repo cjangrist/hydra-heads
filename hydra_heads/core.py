@@ -135,7 +135,7 @@ def setup_logging(verbose: bool = False, quiet: bool = False) -> None:
     coloredlogs.install(
         level=level,
         logger=logger,
-        fmt="%(asctime)s %(name)s %(levelname)s %(message)s",
+        fmt="%(asctime)s %(name)s %(levelname)s %(funcName)s:%(lineno)d %(message)s",
         stream=sys.stderr,
     )
     logger.debug("setup_logging complete")
