@@ -7,11 +7,11 @@
 #   codex.py    → codex    (Codex CLI)
 #   factory.py  → droid    (Factory Droid)
 #   gemini.py   → gemini   (Gemini CLI)
+#   goose.py    → goose    (Goose)
 #   kilo.py     → kilo     (Kilo Code)
 #   kimi.py     → kimi     (Kimi Code)
 #   ob1.py      → ob1      (OB-1)
 #   opencode.py → opencode (OpenCode)
-#   openhands.py→ openhands(OpenHands)
 #
 # Compatible with bash 3.2+ (macOS default).
 
@@ -32,11 +32,11 @@ claude|custom|claude update
 codex|npm|@openai/codex
 droid|npm|@factory/cli
 gemini|npm|@google/gemini-cli
+goose|custom|goose update
 kilo|npm|@kilocode/cli
 kimi|custom|uv tool upgrade kimi-cli
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
-opencode|custom|curl -fsSL https://opencode.ai/install | bash
-openhands|custom|uv tool upgrade openhands"
+opencode|custom|curl -fsSL https://opencode.ai/install | bash"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
