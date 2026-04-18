@@ -32,7 +32,7 @@ claude|custom|claude update
 codex|npm|@openai/codex
 droid|npm|@factory/cli
 gemini|npm|@google/gemini-cli
-goose|custom|goose update
+goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
 kilo|npm|@kilocode/cli
 kimi|custom|uv tool upgrade kimi-cli
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
