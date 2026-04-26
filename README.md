@@ -10,6 +10,7 @@ hydra-heads sends the same prompt to every AI coding CLI you have installed — 
 ```
 $ hydra-heads "review this function for bugs" --quiet | jq 'keys'
 [
+  "aider--openai_mimo-v2.5",
   "claude--opus",
   "codex--gpt-5.4",
   "factory--claude-sonnet-4",
@@ -19,6 +20,7 @@ $ hydra-heads "review this function for bugs" --quiet | jq 'keys'
   "kimi--kimi-for-coding",
   "ob1--o3-pro",
   "opencode--glm-5",
+  "pi--groq_meta-llama_llama-4-scout-17b-16e-instruct",
   "qwen--qwen3-max-preview"
 ]
 ```
@@ -27,7 +29,7 @@ $ hydra-heads "review this function for bugs" --quiet | jq 'keys'
 
 ## Why
 
-One model has blind spots. Ten models reviewing the same code surface things none of them would catch alone.
+One model has blind spots. Many models reviewing the same code surface things none of them would catch alone.
 
 We built hydra-heads to run parallel code reviews across every AI CLI we had installed and cross-reference the findings by consensus. Then we pointed it at its own source code.
 
@@ -59,6 +61,7 @@ Works with any AI coding CLI that takes a prompt argument. These ship built-in:
 
 | Provider | Binary | Default model | Prompt flag |
 |----------|--------|---------------|-------------|
+| [Aider](https://github.com/Aider-AI/aider) | `aider` | auto-detected | `--message` |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `claude` | opus | `-p` |
 | [Codex CLI](https://github.com/openai/codex) | `codex` | gpt-5.4 | stdin |
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` | gemini-3.1-pro-preview | `-p` |
@@ -68,6 +71,7 @@ Works with any AI coding CLI that takes a prompt argument. These ship built-in:
 | [Goose](https://block.github.io/goose/) | `goose` | auto-detected | `-t` |
 | [Factory Droid](https://factory.ai/) | `droid` | auto-detected | stdin |
 | [OB-1](https://ob1.ai/) | `ob1` | auto-detected | `-p` |
+| [Pi Coding Agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) | `pi` | auto-detected | stdin |
 | [Qwen Code](https://github.com/QwenLM/qwen-code) | `qwen` | qwen3-max-preview | `-p` |
 
 Don't have all of them? The preflight ping automatically excludes anything that isn't installed or responding.
@@ -134,6 +138,7 @@ $ hydra-heads --status
 
 Provider     Binary           Status
 ------------ ---------------- ------------
+aider        aider            HEALTHY
 claude       claude           HEALTHY
 codex        codex            HEALTHY
 factory      droid            UNHEALTHY
@@ -143,6 +148,7 @@ kilo         kilo             HEALTHY
 kimi         kimi             HEALTHY
 ob1          ob1              HEALTHY
 opencode     opencode         HEALTHY
+pi           pi               HEALTHY
 qwen         qwen             HEALTHY
 ```
 
@@ -513,7 +519,8 @@ hydra_heads/
   cli.py               # Arg parsing, --status, --schema, prompt resolution
   providers/
     __init__.py         # Auto-discovery + YAML override + type validation
-    claude.py           # One config dict per provider
+    aider.py            # One config dict per provider
+    claude.py
     codex.py
     factory.py
     gemini.py
@@ -522,6 +529,7 @@ hydra_heads/
     kimi.py
     ob1.py
     opencode.py
+    pi.py
     qwen.py
 ```
 
@@ -537,6 +545,7 @@ The meta-beauty: the tool that finds the bugs *is* the tool with the bugs. Every
 $ hydra-heads --prompt-file review.txt --timeout 600 --quiet \
   | jq -r 'to_entries[] | "\(.key): \(.value.status) (\(.value.latency_seconds)s)"'
 
+aider--openai_mimo-v2.5: success (29.4s)
 claude--opus: success (42.1s)
 codex--gpt-5.4: success (38.7s)
 factory--claude-sonnet-4: success (51.3s)
@@ -546,10 +555,11 @@ kimi--kimi-for-coding: success (55.2s)
 kilo--mimo-v2-pro: success (61.8s)
 ob1--o3-pro: success (47.6s)
 opencode--glm-5: success (48.3s)
+pi--groq_meta-llama_llama-4-scout-17b-16e-instruct: success (12.7s)
 qwen--qwen3-max-preview: success (39.4s)
 ```
 
-Ten models. Ten opinions. One JSON.
+Many models. Many opinions. One JSON.
 
 Cut a head off, two more grow back.
 
