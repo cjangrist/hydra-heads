@@ -11,13 +11,15 @@ hydra-heads sends the same prompt to every AI coding CLI you have installed — 
 $ hydra-heads "review this function for bugs" --quiet | jq 'keys'
 [
   "claude--opus",
-  "cline--MiniMax-M2.5-highspeed",
   "codex--gpt-5.4",
   "factory--claude-sonnet-4",
+  "gemini--pro",
+  "goose--claude-sonnet-4-6",
   "kilo--mimo-v2-pro",
   "kimi--kimi-for-coding",
   "ob1--o3-pro",
-  "opencode--glm-5"
+  "opencode--glm-5",
+  "qwen--qwen3-max-preview"
 ]
 ```
 
@@ -25,7 +27,7 @@ $ hydra-heads "review this function for bugs" --quiet | jq 'keys'
 
 ## Why
 
-One model has blind spots. Eight models reviewing the same code surface things none of them would catch alone.
+One model has blind spots. Ten models reviewing the same code surface things none of them would catch alone.
 
 We built hydra-heads to run parallel code reviews across every AI CLI we had installed and cross-reference the findings by consensus. Then we pointed it at its own source code.
 
@@ -63,9 +65,10 @@ Works with any AI coding CLI that takes a prompt argument. These ship built-in:
 | [Kimi](https://github.com/kimiAI/kimi-cli) | `kimi` | auto-detected | `-p` |
 | [Kilo Code](https://kilocode.ai/) | `kilo` | auto-detected | stdin |
 | [OpenCode](https://opencode.ai/) | `opencode` | auto-detected | stdin |
-| [Cline](https://cline.bot/) | `cline` | auto-detected | stdin |
+| [Goose](https://block.github.io/goose/) | `goose` | auto-detected | `-t` |
 | [Factory Droid](https://factory.ai/) | `droid` | auto-detected | stdin |
 | [OB-1](https://ob1.ai/) | `ob1` | auto-detected | `-p` |
+| [Qwen Code](https://github.com/QwenLM/qwen-code) | `qwen` | qwen3-max-preview | `-p` |
 
 Don't have all of them? The preflight ping automatically excludes anything that isn't installed or responding.
 
@@ -132,14 +135,15 @@ $ hydra-heads --status
 Provider     Binary           Status
 ------------ ---------------- ------------
 claude       claude           HEALTHY
-cline        cline            HEALTHY
 codex        codex            HEALTHY
-factory      droid            HEALTHY
-gemini       gemini           UNHEALTHY
+factory      droid            UNHEALTHY
+gemini       gemini           HEALTHY
+goose        goose            HEALTHY
 kilo         kilo             HEALTHY
 kimi         kimi             HEALTHY
 ob1          ob1              HEALTHY
 opencode     opencode         HEALTHY
+qwen         qwen             HEALTHY
 ```
 
 ---
@@ -510,14 +514,15 @@ hydra_heads/
   providers/
     __init__.py         # Auto-discovery + YAML override + type validation
     claude.py           # One config dict per provider
-    cline.py
     codex.py
     factory.py
     gemini.py
+    goose.py
     kilo.py
     kimi.py
     ob1.py
     opencode.py
+    qwen.py
 ```
 
 ---
@@ -535,14 +540,16 @@ $ hydra-heads --prompt-file review.txt --timeout 600 --quiet \
 claude--opus: success (42.1s)
 codex--gpt-5.4: success (38.7s)
 factory--claude-sonnet-4: success (51.3s)
+gemini--pro: success (33.5s)
+goose--claude-sonnet-4-6: success (46.1s)
 kimi--kimi-for-coding: success (55.2s)
 kilo--mimo-v2-pro: success (61.8s)
 ob1--o3-pro: success (47.6s)
 opencode--glm-5: success (48.3s)
-cline--MiniMax-M2.5-highspeed: success (44.9s)
+qwen--qwen3-max-preview: success (39.4s)
 ```
 
-Eight models. Eight opinions. One JSON.
+Ten models. Ten opinions. One JSON.
 
 Cut a head off, two more grow back.
 
