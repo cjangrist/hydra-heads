@@ -3,6 +3,7 @@
 # Source: https://github.com/cjangrist/hydra-heads/tree/main/hydra_heads/providers
 #
 # Provider → Binary mapping (from repo):
+#   aider.py    → aider    (Aider)
 #   claude.py   → claude   (Claude Code)
 #   codex.py    → codex    (Codex CLI)
 #   factory.py  → droid    (Factory Droid)
@@ -12,6 +13,8 @@
 #   kimi.py     → kimi     (Kimi Code)
 #   ob1.py      → ob1      (OB-1)
 #   opencode.py → opencode (OpenCode)
+#   pi.py       → pi       (Pi Coding Agent)
+#   qwen.py     → qwen     (Qwen Code)
 #
 # Compatible with bash 3.2+ (macOS default).
 
@@ -28,15 +31,18 @@ set -eo pipefail
 # Edit these if your install sources differ.
 
 PROVIDER_DEFS="\
+aider|custom|uv tool upgrade aider-chat
 claude|custom|claude update
 codex|npm|@openai/codex
-droid|npm|@factory/cli
+droid|npm|droid
 gemini|npm|@google/gemini-cli
 goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
 kilo|npm|@kilocode/cli
 kimi|custom|uv tool upgrade kimi-cli
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
-opencode|custom|curl -fsSL https://opencode.ai/install | bash"
+opencode|custom|curl -fsSL https://opencode.ai/install | bash
+pi|npm|@mariozechner/pi-coding-agent
+qwen|npm|@qwen-code/qwen-code"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
