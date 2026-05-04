@@ -6,6 +6,6 @@ PROVIDER = {
     "args": ["-p", "--no-session"],
     "prompt_flag": None,
     "model_flag": "--model",
-    "model_detect_command": "jq -er 'select(.defaultProvider and .defaultModel) | (.defaultProvider + \"/\" + .defaultModel)' ~/.pi/agent/settings.json 2>/dev/null || echo default",
+    "model_detect_command": "jq -er 'select(.defaultModel) | .defaultModel | split(\"/\") | last' ~/.pi/agent/settings.json 2>/dev/null || echo default",
     "env": {},
 }
