@@ -205,6 +205,26 @@ Optional: `headers` object, `timeout` (default 5000ms).
 
 **Disagreement between surfaces:** the **CLI docs** use `type: "remote"`; the VS Code extension surface and some Kilo docs reference `type: "streamable-http"` (kebab-case). For `@kilocode/cli` specifically, official CLI docs say `"remote"`.
 
+**Runtime auto-append:** On first read after a manual write, the kilo runtime will append a `permission` block at the top level if absent — e.g.:
+
+```json
+{
+  "$schema": "https://kilo.ai/config.json",
+  "mcp": {
+    "omnisearch": {
+      "type": "remote",
+      "url": "https://your-mcp-server.example.com/mcp",
+      "enabled": true
+    }
+  },
+  "permission": {
+    "bash": "allow"
+  }
+}
+```
+
+This is **CLI-level** auto-approval policy (governs all tool calls — built-in *and* MCP-routed) and is **separate** from per-MCP-server auth. Don't confuse it with `mcp.<name>.headers` / `mcp.<name>.oauth`, which are server-specific.
+
 **CLI add command:**
 
 ```bash
@@ -216,6 +236,13 @@ kilo mcp auth omnisearch    # for OAuth-enabled servers
 The CLI reference lists no `--url` / `--transport` flags for `kilo mcp add`; manual JSON edit is the reliable path.
 
 **Auth/headers:** None required for a public server. Optional `headers` object (e.g., `Authorization`); supports `{env:VAR_NAME}` interpolation; OAuth 2.0 auto-flow when server advertises it (disable with `"oauth": false`).
+
+**Permissions vs. MCP server auth — quick orientation:**
+
+| Concept | Where it lives | Scope |
+|---|---|---|
+| Tool auto-approval policy | `permission.<tool>: "allow"\|"ask"\|"deny"` (top-level) or `KILO_PERMISSION` env var | CLI-wide; applies to bash/edit/write/MCP tool calls uniformly |
+| MCP server connection auth | `mcp.<name>.headers` / `.oauth` / `.bearerToken` | Per-server only |
 
 **Sources:**
 - https://kilo.ai/docs/automate/mcp/using-in-cli — official MCP-in-CLI docs
