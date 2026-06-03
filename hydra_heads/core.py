@@ -308,7 +308,8 @@ def _fallback_prompt_title(prompt: str) -> str:
 _TITLE_PREAMBLE_RE = re.compile(
     r"^(?:here(?:[\s-]+(?:is|are))?|sure|okay|ok|certainly|absolutely|"
     r"of[\s-]+course|no[\s-]+problem|i(?:[\s-]?ll|[\s-]+will|will|[\s-]?ve|[\s-]?d|[\s-]?m)\b|"
-    r"generate|generating|title[\s-]|a[\s-]+(?:good|suitable|relevant|possible)|"
+    r"generate|generating|title[\s-]|dash[\s-]+separated|lowercase|"
+    r"a[\s-]+(?:good|suitable|relevant|possible)|"
     r"the[\s-]+title|this[\s-]+is|below|following|response)"
 )
 
