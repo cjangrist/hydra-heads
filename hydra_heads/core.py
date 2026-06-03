@@ -305,32 +305,76 @@ def _fallback_prompt_title(prompt: str) -> str:
     return '-'.join(words) if words else "untitled-task"
 
 
+_TITLE_PREAMBLE_RE = re.compile(
+    r"^(?:here(?:[\s-]+(?:is|are))?|sure|okay|ok|certainly|absolutely|"
+    r"of[\s-]+course|no[\s-]+problem|i(?:[\s-]?ll|[\s-]+will|will|[\s-]?ve|[\s-]?d|[\s-]?m)\b|"
+    r"generate|generating|title[\s-]|a[\s-]+(?:good|suitable|relevant|possible)|"
+    r"the[\s-]+title|this[\s-]+is|below|following|response)"
+)
+
+
+def _clean_title_str(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
+
+
+def _try_title_words(clean: str) -> str:
+    """Return dash-joined title words if clean string passes length and preamble checks, else ''."""
+    words = [w for w in clean.split("-") if w]
+    if len(words) < 2:
+        return ""
+    words = words[:10]
+    if _TITLE_PREAMBLE_RE.match(clean):
+        return ""
+    return "-".join(words)
+
+
+_XML_TAG_RE = re.compile(r"<[^>]+>")
+
+
 def _parse_title_response(response: str) -> str:
-    """Parse a title generation response into a clean dash-separated title. Returns empty string on failure."""
-    raw_title = response.strip().split("\n")[0].strip()
-    clean = re.sub(r'[^a-z0-9]+', '-', raw_title.lower()).strip('-')
-    words = [w for w in clean.split('-') if w]
-    if len(words) > 10:
-        words = words[:10]
-    if words:
-        return '-'.join(words)
+    """Scan all response lines for a clean dash-separated title; reject preamble and out-of-range word counts."""
+    for raw_line in response.strip().split("\n"):
+        # Strip XML/HTML tags (e.g., <thinking> blocks from reasoning models)
+        line = _XML_TAG_RE.sub("", raw_line).strip()
+        if not line:
+            continue
+        # Lines that end with a colon are pure intro/label lines — title is on the next line
+        if line.endswith(":"):
+            continue
+        # Lines with an inline label "Label: actual-title" — prefer the part after the colon
+        if ":" in line:
+            after_colon = line.split(":", 1)[1].strip()
+            if after_colon:
+                candidate = _try_title_words(_clean_title_str(after_colon))
+                if candidate:
+                    return candidate
+        candidate = _try_title_words(_clean_title_str(line))
+        if candidate:
+            return candidate
     return ""
 
 
 def _generate_prompt_title(provider_configs: list, commands: dict, prompt: str,
-                           timeout_seconds: int = 45,
+                           timeout_seconds: int = 30,
                            abort_event: threading.Event = None,
                            running_processes: dict = None,
                            process_lock: threading.Lock = None) -> str:
-    """Try providers in order of latency until one produces a usable title. Falls back to word extraction."""
+    """Race all providers in parallel; first valid title wins, others are aborted. Falls back to word extraction."""
     title_prompt = (
         "Generate a 4 to 10 word dash-separated lowercase title for the following task. "
         "Respond with ONLY the title on a single line. "
         "No quotes, no explanation, no markdown, no formatting.\n\n"
         f"{prompt[:2000]}"
     )
-    for provider_config in provider_configs:
+
+    title_done = threading.Event()
+    title_result: dict = {"value": None}
+    result_lock = threading.Lock()
+
+    def try_provider(provider_config: dict) -> None:
         name = provider_config["name"]
+        if title_done.is_set() or (abort_event and abort_event.is_set()):
+            return
         title_dir = tempfile.mkdtemp(prefix="hydra_title_")
         try:
             stdout_log = os.path.join(title_dir, "title_stdout.log")
@@ -339,20 +383,39 @@ def _generate_prompt_title(provider_configs: list, commands: dict, prompt: str,
                 commands[name], provider_config, title_prompt,
                 stdout_log, stderr_log,
                 timeout_seconds=timeout_seconds,
-                abort_event=abort_event,
+                abort_event=title_done,
                 running_processes=running_processes,
                 process_lock=process_lock,
             )
+            if title_done.is_set():
+                return
             if result["status"] == "success" and result["response"]:
                 parsed = _parse_title_response(result["response"])
                 if parsed:
-                    return parsed
-            logger.warning(f"Title generation from {name} returned unusable response, trying next")
+                    with result_lock:
+                        if title_result["value"] is None:
+                            title_result["value"] = parsed
+                    title_done.set()
+                    logger.info(f"Title won by {name}: {parsed}")
+                    return
+            logger.warning(f"Title generation from {name} returned unusable response")
         except Exception as title_error:
-            logger.warning(f"Title generation from {name} failed ({type(title_error).__name__}), trying next")
+            logger.warning(f"Title generation from {name} failed ({type(title_error).__name__})")
         finally:
             shutil.rmtree(title_dir, ignore_errors=True)
 
+    with ThreadPoolExecutor(max_workers=len(provider_configs)) as executor:
+        futs = [executor.submit(try_provider, pc) for pc in provider_configs]
+        deadline = time.monotonic() + timeout_seconds + 5
+        while not title_done.is_set() and not all(f.done() for f in futs):
+            if time.monotonic() >= deadline or (abort_event and abort_event.is_set()):
+                title_done.set()
+                break
+            time.sleep(0.1)
+        title_done.set()
+
+    if title_result["value"]:
+        return title_result["value"]
     logger.warning("All providers failed title generation, using word extraction fallback")
     return _fallback_prompt_title(prompt)
 
@@ -1116,10 +1179,10 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             if healthy_latencies:
                 sorted_by_speed = sorted(healthy_latencies, key=healthy_latencies.get)
                 sorted_configs = [next(pc for pc in provider_configs if pc["name"] == n) for n in sorted_by_speed]
-                logger.info(f"Title generation order (by latency): {', '.join(sorted_by_speed)}")
+                logger.info(f"Title generation providers (parallel waterfall): {', '.join(sorted_by_speed)}")
                 prompt_title = _generate_prompt_title(
                     sorted_configs, commands, prompt,
-                    timeout_seconds=45,
+                    timeout_seconds=30,
                     abort_event=abort_event,
                     running_processes=running_processes,
                     process_lock=process_lock,
