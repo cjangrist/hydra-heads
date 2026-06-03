@@ -34,14 +34,14 @@ PROVIDER_DEFS="\
 aider|custom|uv tool upgrade aider-chat
 claude|custom|claude update
 codex|npm|@openai/codex
-droid|npm|droid
+droid|custom|droid update
 gemini|npm|@google/gemini-cli
 goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
 kilo|npm|@kilocode/cli
-kimi|custom|uv tool upgrade kimi-cli
+kimi|custom|uv tool upgrade kimi-cli --no-cache
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
-opencode|custom|curl -fsSL https://opencode.ai/install | bash
-pi|npm|@mariozechner/pi-coding-agent
+opencode|custom|opencode upgrade
+pi|custom|pi update
 qwen|npm|@qwen-code/qwen-code"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -93,8 +93,10 @@ log_dim()   { printf "${DIM}       %b${RESET}\n" "$*"; }
 get_version() {
     local bin="$1"
     local ver=""
-    for flag in --version -v version; do
-        ver=$("$bin" $flag 2>/dev/null | head -1) && [ -n "$ver" ] && {
+    # Merge stderr (some tools like pi write version to stderr); filter node deprecation noise.
+    # Only try --version / -v flags — never bare subcommand 'version' which can invoke an agent.
+    for flag in --version -v; do
+        ver=$("$bin" $flag 2>&1 | grep -v -E '^\(node:[0-9]+\)|^\(Use |DeprecationWarning' | head -1) && [ -n "$ver" ] && {
             echo "$ver"
             return 0
         }
