@@ -33,6 +33,25 @@ DEFAULT_RETRIES = 0
 PREFLIGHT_PING_PROMPT = "respond with just the word pong"
 PREFLIGHT_PING_TIMEOUT_SECONDS = 45
 SIGTERM_GRACE_PERIOD_SECONDS = 5
+
+# Ordered list of providers trusted for title generation (best-to-worst confirmed quality).
+# Providers NOT listed here are excluded from title gen — either untested or known to produce
+# garbage (e.g., goose always emits its TUI startup banner instead of a clean response).
+TITLE_GEN_PRIORITY = [
+    "claude",    # clean, accurate
+    "codex",     # clean
+    "qwen",      # clean
+    "gemini",    # clean
+    "kimi",      # clean (expected; consistent instruction-following)
+    "pi",        # clean
+    "opencode",  # clean
+    "kilo",      # clean
+    "ob1",       # untested; likely fine
+    "aider",     # untested; likely fine
+    "droid",     # untested; likely fine
+    # goose: excluded — run -t always emits TUI startup banner before any output
+]
+_TITLE_GEN_PRIORITY_SET = set(TITLE_GEN_PRIORITY)
 WAIT_POLL_INTERVAL_SECONDS = 0.5
 STREAM_BUFFER_MAX_CHUNKS = 500
 STREAM_PANEL_HEIGHT = 6
@@ -360,13 +379,22 @@ def _generate_prompt_title(provider_configs: list, commands: dict, prompt: str,
                            abort_event: threading.Event = None,
                            running_processes: dict = None,
                            process_lock: threading.Lock = None) -> str:
-    """Race all providers in parallel; first valid title wins, others are aborted. Falls back to word extraction."""
+    """Race priority providers in parallel; first valid title wins, others are aborted. Falls back to word extraction."""
     title_prompt = (
         "Generate a 4 to 10 word dash-separated lowercase title for the following task. "
         "Respond with ONLY the title on a single line. "
         "No quotes, no explanation, no markdown, no formatting.\n\n"
         f"{prompt[:2000]}"
     )
+
+    # Use only providers trusted for clean title output; fall back to all if none are healthy.
+    priority_configs = [pc for pc in provider_configs if pc["name"] in _TITLE_GEN_PRIORITY_SET]
+    if not priority_configs:
+        priority_configs = provider_configs
+    # Sort within the priority list by declared order (best first).
+    priority_order = {name: i for i, name in enumerate(TITLE_GEN_PRIORITY)}
+    priority_configs = sorted(priority_configs, key=lambda pc: priority_order.get(pc["name"], 999))
+    logger.info(f"Title gen providers: {', '.join(pc['name'] for pc in priority_configs)}")
 
     title_done = threading.Event()
     title_result: dict = {"value": None}
@@ -405,8 +433,8 @@ def _generate_prompt_title(provider_configs: list, commands: dict, prompt: str,
         finally:
             shutil.rmtree(title_dir, ignore_errors=True)
 
-    with ThreadPoolExecutor(max_workers=len(provider_configs)) as executor:
-        futs = [executor.submit(try_provider, pc) for pc in provider_configs]
+    with ThreadPoolExecutor(max_workers=len(priority_configs)) as executor:
+        futs = [executor.submit(try_provider, pc) for pc in priority_configs]
         deadline = time.monotonic() + timeout_seconds + 5
         while not title_done.is_set() and not all(f.done() for f in futs):
             if time.monotonic() >= deadline or (abort_event and abort_event.is_set()):
