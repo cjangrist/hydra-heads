@@ -211,6 +211,18 @@ def _make_display_name(provider_name: str, model_name: str) -> str:
     return provider_name
 
 
+def _log_provider_roster(display_names: dict) -> None:
+    """Log a prominent, greppable provider+model roster block."""
+    n = len(display_names)
+    bar = "=" * 64
+    logger.info(bar)
+    logger.info(f"HYDRA ROSTER — {n} provider{'s' if n != 1 else ''}")
+    for provider, display in display_names.items():
+        model = display[len(provider) + 2:] if display.startswith(provider + "--") else ""
+        logger.info(f"  [ROSTER] {provider:<14} {model}")
+    logger.info(bar)
+
+
 def _build_command_args(provider_config: dict, prompt: str, model_override: str = None) -> list:
     """Build the full argument list for a provider invocation, optionally overriding the model."""
     logger.debug(f"_build_command_args for provider={provider_config['name']}")
@@ -1129,7 +1141,6 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
     seen = set()
     provider_names = [n for n in provider_names if n not in seen and not seen.add(n)]
 
-    logger.info(f"Providers: {', '.join(provider_names)}")
     logger.info(f"Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
     if timeout_seconds is not None:
         logger.info(f"Timeout: {timeout_seconds}s per provider")
@@ -1224,7 +1235,7 @@ def run_hydra(prompt: str, provider_names: list = None, log_base_directory: str 
             provider_model_override = (model_overrides or {}).get(pname)
             detected_model = _detect_model(provider_config, model_override=provider_model_override)
             display_names[pname] = _make_display_name(pname, detected_model)
-        logger.info(f"Display names: {', '.join(display_names.values())}")
+        _log_provider_roster(display_names)
 
         task_directory, folder_name = _prepare_task_directory(log_base_directory, prompt_md5, prompt_title)
         Path(task_directory, "prompt.md").write_text(prompt, encoding="utf-8")
