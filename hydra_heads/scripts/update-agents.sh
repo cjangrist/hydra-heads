@@ -38,7 +38,7 @@ codex|npm|@openai/codex
 droid|custom|droid update
 goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
 kilo|npm|@kilocode/cli
-kimi|custom|uv tool upgrade kimi-cli --no-cache
+kimi|custom|kimi upgrade
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
 opencode|custom|opencode upgrade
 pi|custom|pi update
