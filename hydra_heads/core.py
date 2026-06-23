@@ -693,14 +693,19 @@ def _launch_and_collect(command, provider_config: dict, prompt: str,
 
     command_args = _build_command_args(provider_config, prompt, model_override=model_override)
     environment = _build_environment(provider_config)
-    logger.info(f"Launching {provider_name}")
+    # Some CLIs (e.g. agy/Antigravity) gate stdout on isatty() and emit zero bytes unless
+    # stdout is a terminal. Such providers set "tty": true, which allocates a pseudo-terminal
+    # (sh _tty_out=True). The PTY output is still captured to the log file via _out. All other
+    # providers keep _tty_out=False (plain pipe), so this has zero effect on them.
+    use_tty = bool(provider_config.get("tty", False))
+    logger.info(f"Launching {provider_name}{' (pty)' if use_tty else ''}")
 
     sh_kwargs = {
         "_out": stdout_log,
         "_err": stderr_log,
         "_out_bufsize": 0,
         "_err_bufsize": 0,
-        "_tty_out": False,
+        "_tty_out": use_tty,
         "_bg": True,
         "_bg_exc": False,
         "_new_session": True,

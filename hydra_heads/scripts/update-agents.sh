@@ -7,7 +7,7 @@
 #   claude.py   → claude   (Claude Code)
 #   codex.py    → codex    (Codex CLI)
 #   factory.py  → droid    (Factory Droid)
-#   gemini.py   → gemini   (Gemini CLI)
+#   gemini.py   → agy      (Antigravity CLI — Gemini 3.1 Pro; legacy gemini CLI retired 2026-06-18)
 #   goose.py    → goose    (Goose)
 #   kilo.py     → kilo     (Kilo Code)
 #   kimi.py     → kimi     (Kimi Code)
@@ -31,11 +31,11 @@ set -eo pipefail
 # Edit these if your install sources differ.
 
 PROVIDER_DEFS="\
+agy|custom|curl -fsSL https://antigravity.google/cli/install.sh | bash
 aider|custom|uv tool upgrade aider-chat
 claude|custom|claude update
 codex|npm|@openai/codex
 droid|custom|droid update
-gemini|npm|@google/gemini-cli
 goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
 kilo|npm|@kilocode/cli
 kimi|custom|uv tool upgrade kimi-cli --no-cache

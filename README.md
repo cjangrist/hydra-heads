@@ -14,7 +14,7 @@ $ hydra-heads "review this function for bugs" --quiet | jq 'keys'
   "claude--opus",
   "codex--gpt-5.4",
   "factory--claude-sonnet-4",
-  "gemini--pro",
+  "gemini--Gemini_3.1_Pro__High_",
   "goose--claude-sonnet-4-6",
   "kilo--mimo-v2-pro",
   "kimi--kimi-for-coding",
@@ -64,7 +64,7 @@ Works with any AI coding CLI that takes a prompt argument. These ship built-in:
 | [Aider](https://github.com/Aider-AI/aider) | `aider` | auto-detected | `--message` |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `claude` | opus | `-p` |
 | [Codex CLI](https://github.com/openai/codex) | `codex` | gpt-5.4 | stdin |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `gemini` | gemini-3.1-pro-preview | `-p` |
+| [Gemini via Antigravity CLI](https://antigravity.google) | `agy` | Gemini 3.1 Pro (High) | `--print` |
 | [Kimi](https://github.com/kimiAI/kimi-cli) | `kimi` | auto-detected | `-p` |
 | [Kilo Code](https://kilocode.ai/) | `kilo` | auto-detected | stdin |
 | [OpenCode](https://opencode.ai/) | `opencode` | auto-detected | stdin |
@@ -142,7 +142,7 @@ aider        aider            HEALTHY
 claude       claude           HEALTHY
 codex        codex            HEALTHY
 factory      droid            UNHEALTHY
-gemini       gemini           HEALTHY
+gemini       agy              HEALTHY
 goose        goose            HEALTHY
 kilo         kilo             HEALTHY
 kimi         kimi             HEALTHY
@@ -549,7 +549,7 @@ aider--openai_mimo-v2.5: success (29.4s)
 claude--opus: success (42.1s)
 codex--gpt-5.4: success (38.7s)
 factory--claude-sonnet-4: success (51.3s)
-gemini--pro: success (33.5s)
+gemini--Gemini_3.1_Pro__High_: success (33.5s)
 goose--claude-sonnet-4-6: success (46.1s)
 kimi--kimi-for-coding: success (55.2s)
 kilo--mimo-v2-pro: success (61.8s)

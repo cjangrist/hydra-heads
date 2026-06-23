@@ -46,6 +46,10 @@ def _validate_provider_config(config: dict, source_name: str) -> bool:
     if prompt_flag is not None and not isinstance(prompt_flag, str):
         logger.warning(f"Provider '{source_name}' 'prompt_flag' must be a string or null, skipping")
         return False
+    tty = config.get("tty")
+    if tty is not None and not isinstance(tty, bool):
+        logger.warning(f"Provider '{source_name}' 'tty' must be a boolean or null, skipping")
+        return False
     return True
 
 
