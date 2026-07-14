@@ -47,8 +47,7 @@ TITLE_GEN_PRIORITY = [
     "opencode",  # clean
     "kilo",      # clean
     "ob1",       # untested; likely fine
-    "aider",     # untested; likely fine
-    "droid",     # untested; likely fine
+    # grok: headless output can include a progress sentence before the response
     # goose: excluded — run -t always emits TUI startup banner before any output
 ]
 _TITLE_GEN_PRIORITY_SET = set(TITLE_GEN_PRIORITY)

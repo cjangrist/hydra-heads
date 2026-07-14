@@ -1,9 +1,16 @@
-"""Codex CLI provider — codex exec -m gpt-5.4 -c model_reasoning_effort=high --yolo PROMPT"""
+"""Codex CLI provider — GPT-5.6 Sol with Fast mode, extra-high reasoning, and no approvals."""
 
 PROVIDER = {
     "name": "codex",
     "binary": "codex",
-    "args": ["exec", "-m", "gpt-5.5", "-c", "model_reasoning_effort=xhigh", "--yolo"],
+    "args": [
+        "exec",
+        "-m", "gpt-5.6-sol",
+        "-c", "service_tier=\"fast\"",
+        "-c", "features.fast_mode=true",
+        "-c", "model_reasoning_effort=\"xhigh\"",
+        "--yolo",
+    ],
     "prompt_flag": None,
     "model_flag": "-m",
     "env": {},

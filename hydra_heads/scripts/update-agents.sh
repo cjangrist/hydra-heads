@@ -3,12 +3,11 @@
 # Source: https://github.com/cjangrist/hydra-heads/tree/main/hydra_heads/providers
 #
 # Provider → Binary mapping (from repo):
-#   aider.py    → aider    (Aider)
 #   claude.py   → claude   (Claude Code)
 #   codex.py    → codex    (Codex CLI)
-#   factory.py  → droid    (Factory Droid)
 #   gemini.py   → agy      (Antigravity CLI — Gemini 3.1 Pro; legacy gemini CLI retired 2026-06-18)
 #   goose.py    → goose    (Goose)
+#   grok.py     → grok     (Grok Build)
 #   kilo.py     → kilo     (Kilo Code)
 #   kimi.py     → kimi     (Kimi Code)
 #   ob1.py      → ob1      (OB-1)
@@ -32,16 +31,15 @@ set -eo pipefail
 
 PROVIDER_DEFS="\
 agy|custom|curl -fsSL https://antigravity.google/cli/install.sh | bash
-aider|custom|uv tool upgrade aider-chat
 claude|custom|claude update
-codex|npm|@openai/codex
-droid|custom|droid update
+codex|custom|codex update
 goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
-kilo|npm|@kilocode/cli
-kimi|custom|kimi upgrade
+grok|custom|grok update
+kilo|custom|pnpm add --global @kilocode/cli
+kimi|custom|curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
-opencode|custom|opencode upgrade
-pi|custom|pi update
+opencode|custom|export XDG_BIN_DIR=\$HOME/.local/bin; curl -fsSL https://opencode.ai/install | bash
+pi|custom|curl -fsSL https://pi.dev/install.sh | sh
 qwen|npm|@qwen-code/qwen-code"
 
 # ── Colors ────────────────────────────────────────────────────────────────────

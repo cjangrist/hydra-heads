@@ -17,11 +17,9 @@ Example server URL used throughout: `https://your-mcp-server.example.com/mcp` (p
 | kilo | ✅ native (`type: "remote"`) | `~/.config/kilo/kilo.json` | ✅ official docs (CLI add has bug #7079) |
 | kimi | ✅ native | `~/.kimi/mcp.json` | ✅ official docs |
 | opencode | ✅ native (`type: "remote"`, auto SH→SSE fallback) | `opencode.json[c]` or `~/.config/opencode/opencode.json` | ✅ source code (PR #444 + e8eaa77) |
-| factory | ✅ native (`type: "http"`) | `~/.factory/mcp.json` | ✅ official docs |
 | goose | ✅ native (`type: streamable_http`) | `~/.config/goose/config.yaml` | ✅ official docs + issue #6576 |
 | pi | ⚠️ via extension only (`pi-mcp-adapter`) | `~/.pi/agent/mcp.json` (after install) | ✅ via npm package + author blog |
 | ob1 | ❓ undocumented publicly | unverified — likely `~/.ob1/settings.json` | ⚠️ schema NOT on openblocklabs.com |
-| aider | ❌ no MCP support | N/A | ✅ confirmed: issue #4506 still open |
 
 ---
 
@@ -322,46 +320,6 @@ Optional keys: `headers`, `oauth: {}`, `timeout: 5000`.
 
 ---
 
-## factory (Factory Droid CLI — `droid`)
-
-**Remote-HTTP MCP support:** Yes, native. Two transports supported: `http` (remote) and `stdio` (local). Factory uses the type identifier `"http"` — note this differs from clients that use `"streamable-http"`.
-
-**Config file:** `~/.factory/mcp.json` (user) or `.factory/mcp.json` (project). User config takes precedence when both define the same server.
-
-**JSON snippet:**
-
-```json
-{
-  "mcpServers": {
-    "omnisearch": {
-      "type": "http",
-      "url": "https://your-mcp-server.example.com/mcp",
-      "disabled": false
-    }
-  }
-}
-```
-
-Optional fields: `headers` (object), `disabledTools` (string array).
-
-**CLI add command:**
-
-```bash
-droid mcp add omnisearch https://your-mcp-server.example.com/mcp --type http
-# with auth header (repeatable):
-# droid mcp add omnisearch <url> --type http --header "Authorization: Bearer …"
-```
-
-Servers added via CLI always land in `~/.factory/mcp.json`. Verify with `droid mcp` or the in-TUI `/mcp` panel.
-
-**Auth/headers:** None needed for public servers. Omit `headers`.
-
-**Sources:**
-- https://docs.factory.ai/cli/configuration/mcp — official MCP config docs
-- https://docs.factory.ai/reference/cli-reference — CLI command reference
-
----
-
 ## goose (Block Goose)
 
 **Remote-HTTP MCP support:** Yes — explicit `streamable_http` extension type.
@@ -485,28 +443,13 @@ Optional fields: `headers` (supports `${VAR}` interpolation), `auth` (`"bearer"`
 
 ---
 
-## aider (Aider — `aider-chat`)
-
-**Remote-HTTP MCP support:** None. No MCP support at all. Not stdio, not HTTP. Verified via aider's `HISTORY.html` (no MCP entries through 0.86.x and main) and the still-open feature request issue #4506 ("Add native MCP server and Agent Mode support") which has no maintainer-shipped implementation.
-
-Aider's context tools remain `/web`, `/run`, `/read-only`. Third-party wrappers like `disler/aider-mcp-server` expose Aider *as* an MCP server to other clients; they do not let aider consume a remote MCP server.
-
-**Config file:** N/A. Aider's config (`.aider.conf.yml`, env vars, CLI flags) has no MCP fields.
-
-**Sources:**
-- https://github.com/Aider-AI/aider/issues/4506 — open feature request "Add native MCP server and Agent Mode support"
-- https://aider.chat/HISTORY.html — release history (no MCP through 0.86.x)
-- https://aider.chat/docs/config.html — config reference (no MCP fields)
-
----
-
 ## Notable Schema Differences (NON-UNIFORM!)
 
 The `type` key value varies wildly across CLIs — there is no single common form:
 
 | Variant | Used by |
 |---|---|
-| `"http"` | claude, factory |
+| `"http"` | claude |
 | `"remote"` | kilo, opencode |
 | `"streamable_http"` (snake) | goose |
 | `"streamableHttp"` (camel, unverified) | ob1 |
@@ -517,13 +460,13 @@ The `type` key value varies wildly across CLIs — there is no single common for
 
 | Variant | Used by |
 |---|---|
-| `url` | claude, codex, kilo, kimi, opencode, factory, ob1, pi |
+| `url` | claude, codex, kilo, kimi, opencode, ob1, pi |
 | `httpUrl` | gemini, qwen |
 | `uri` | goose (YAML) |
 
 **Config format:**
 
-- **JSON:** claude, gemini, qwen, kilo, kimi, opencode, factory, pi, ob1
+- **JSON:** claude, gemini, qwen, kilo, kimi, opencode, pi, ob1
 - **TOML:** codex
 - **YAML:** goose
 
@@ -537,8 +480,7 @@ The `type` key value varies wildly across CLIs — there is no single common for
 
 ## Verification Status
 
-- **9 verified from official docs/source:** claude, codex, gemini, qwen, kilo, kimi, opencode, factory, goose
+- **8 verified from official docs/source:** claude, codex, gemini, qwen, kilo, kimi, opencode, goose
 - **2 require care:**
   - **pi** — needs `pi-mcp-adapter` extension installed first; verified via npm + author blog
   - **ob1** — schema NOT published on openblocklabs.com; confirm via `/migrate` flow or Discord
-- **1 dead-end:** **aider** — no MCP support; tracked in open issue #4506 with no maintainer commitment

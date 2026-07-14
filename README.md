@@ -5,23 +5,22 @@
 
 > **Cut off one head, two more shall take its place.**
 
-hydra-heads sends the same prompt to every AI coding CLI you have installed — in parallel — and returns structured JSON with every response. Preflight pings auto-exclude dead providers, each agent gets an isolated sandbox directory, output keys tell you exactly whose opinion you're reading (`claude--opus`, `codex--gpt-5.4`, `kimi--kimi-for-coding`), and full logs with token counts are saved to disk.
+hydra-heads sends the same prompt to every AI coding CLI you have installed — in parallel — and returns structured JSON with every response. Preflight pings auto-exclude dead providers, each agent gets an isolated sandbox directory, output keys tell you exactly whose opinion you're reading (`claude--opus`, `codex--gpt-5.6-sol`, `kimi--kimi-for-coding`), and full logs with token counts are saved to disk.
 
 ```
 $ hydra-heads "review this function for bugs" --quiet | jq 'keys'
 [
-  "aider--openai_mimo-v2.5",
   "claude--opus",
-  "codex--gpt-5.4",
-  "factory--claude-sonnet-4",
+  "codex--gpt-5.6-sol",
   "gemini--Gemini_3.1_Pro__High_",
   "goose--claude-sonnet-4-6",
+  "grok",
   "kilo--mimo-v2-pro",
   "kimi--kimi-for-coding",
   "ob1--o3-pro",
   "opencode--glm-5",
   "pi--groq_meta-llama_llama-4-scout-17b-16e-instruct",
-  "qwen--qwen3-max-preview"
+  "qwen--qwen3.7-max"
 ]
 ```
 
@@ -61,18 +60,17 @@ Works with any AI coding CLI that takes a prompt argument. These ship built-in:
 
 | Provider | Binary | Default model | Prompt flag |
 |----------|--------|---------------|-------------|
-| [Aider](https://github.com/Aider-AI/aider) | `aider` | auto-detected | `--message` |
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `claude` | opus | `-p` |
-| [Codex CLI](https://github.com/openai/codex) | `codex` | gpt-5.4 | stdin |
+| [Codex CLI](https://github.com/openai/codex) | `codex` | gpt-5.6-sol (Fast) | stdin |
 | [Gemini via Antigravity CLI](https://antigravity.google) | `agy` | Gemini 3.1 Pro (High) | `--print` |
+| [Grok Build](https://docs.x.ai/build/overview) | `grok` | auto-detected | `-p` |
 | [Kimi](https://github.com/kimiAI/kimi-cli) | `kimi` | auto-detected | `-p` |
 | [Kilo Code](https://kilocode.ai/) | `kilo` | auto-detected | stdin |
 | [OpenCode](https://opencode.ai/) | `opencode` | auto-detected | stdin |
 | [Goose](https://block.github.io/goose/) | `goose` | auto-detected | `-t` |
-| [Factory Droid](https://factory.ai/) | `droid` | auto-detected | stdin |
 | [OB-1](https://ob1.ai/) | `ob1` | auto-detected | `-p` |
 | [Pi Coding Agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) | `pi` | auto-detected | stdin |
-| [Qwen Code](https://github.com/QwenLM/qwen-code) | `qwen` | qwen3-max-preview | `-p` |
+| [Qwen Code](https://github.com/QwenLM/qwen-code) | `qwen` | qwen3.7-max | `-p` |
 
 Don't have all of them? The preflight ping automatically excludes anything that isn't installed or responding.
 
@@ -80,10 +78,10 @@ Don't have all of them? The preflight ping automatically excludes anything that 
 
 ```yaml
 providers:
-  - name: aider
-    binary: aider
-    args: ["--yes", "--no-git"]
-    prompt_flag: "--message"
+  - name: custom-agent
+    binary: custom-agent
+    args: ["--non-interactive"]
+    prompt_flag: "--prompt"
     model_flag: "--model"       # optional: flag to override model
     env: {}                     # optional: environment variables
 ```
@@ -138,12 +136,11 @@ $ hydra-heads --status
 
 Provider     Binary           Status
 ------------ ---------------- ------------
-aider        aider            HEALTHY
 claude       claude           HEALTHY
 codex        codex            HEALTHY
-factory      droid            UNHEALTHY
 gemini       agy              HEALTHY
 goose        goose            HEALTHY
+grok         grok             HEALTHY
 kilo         kilo             HEALTHY
 kimi         kimi             HEALTHY
 ob1          ob1              HEALTHY
@@ -162,19 +159,19 @@ Each provider result includes the response, sandbox path, a sorted file listing,
 
 ```json
 {
-  "codex--gpt-5.4": {
+  "codex--gpt-5.6-sol": {
     "response": "4",
     "exit_code": 0,
     "latency_seconds": 17.73,
     "status": "success",
     "logs": {
       "stdout": {
-        "path": "/home/user/project/tmp/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.4/logs/stdout.log",
+        "path": "/home/user/project/tmp/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.6-sol/logs/stdout.log",
         "size_bytes": 2,
         "token_count": 2
       },
       "stderr": {
-        "path": "/home/user/project/tmp/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.4/logs/stderr.log",
+        "path": "/home/user/project/tmp/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.6-sol/logs/stderr.log",
         "size_bytes": 5207,
         "token_count": 1819
       }
@@ -186,23 +183,23 @@ Each provider result includes the response, sandbox path, a sorted file listing,
         "status": "success",
         "latency_seconds": 17.73,
         "logs": {
-          "stdout": "/home/user/.hydra/tasks/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.4_stdout.log",
-          "stderr": "/home/user/.hydra/tasks/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.4_stderr.log"
+          "stdout": "/home/user/.hydra/tasks/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.6-sol_stdout.log",
+          "stderr": "/home/user/.hydra/tasks/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.6-sol_stderr.log"
         }
       }
     ],
-    "sandbox_path": "/home/user/project/tmp/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.4",
+    "sandbox_path": "/home/user/project/tmp/2026-04-10-11-16-47_0eaf9d0_answer-two-plus-two/codex--gpt-5.6-sol",
     "sandbox_files": [
-      "/home/user/project/tmp/.../codex--gpt-5.4/logs/stderr.log",
-      "/home/user/project/tmp/.../codex--gpt-5.4/logs/stdout.log",
-      "/home/user/project/tmp/.../codex--gpt-5.4/response.md",
-      "/home/user/project/tmp/.../codex--gpt-5.4/task_exit_code__0.txt",
-      "/home/user/project/tmp/.../codex--gpt-5.4/task_finished_at__2026-04-10T11-17-05.txt",
-      "/home/user/project/tmp/.../codex--gpt-5.4/task_started_at__2026-04-10T11-16-47.txt"
+      "/home/user/project/tmp/.../codex--gpt-5.6-sol/logs/stderr.log",
+      "/home/user/project/tmp/.../codex--gpt-5.6-sol/logs/stdout.log",
+      "/home/user/project/tmp/.../codex--gpt-5.6-sol/response.md",
+      "/home/user/project/tmp/.../codex--gpt-5.6-sol/task_exit_code__0.txt",
+      "/home/user/project/tmp/.../codex--gpt-5.6-sol/task_finished_at__2026-04-10T11-17-05.txt",
+      "/home/user/project/tmp/.../codex--gpt-5.6-sol/task_started_at__2026-04-10T11-16-47.txt"
     ],
     "gist": [
       {
-        "path": "/home/user/project/tmp/.../codex--gpt-5.4/logs/stderr.log",
+        "path": "/home/user/project/tmp/.../codex--gpt-5.6-sol/logs/stderr.log",
         "size_bytes": 5207,
         "line_count": 91,
         "token_count": 1819,
@@ -210,14 +207,14 @@ Each provider result includes the response, sandbox path, a sorted file listing,
         "tail_25_lines": "tokens used\n12,725\n"
       },
       {
-        "path": "/home/user/project/tmp/.../codex--gpt-5.4/response.md",
+        "path": "/home/user/project/tmp/.../codex--gpt-5.6-sol/response.md",
         "size_bytes": 2,
         "line_count": 2,
         "token_count": 2,
         "first_25_lines": "4\n"
       },
       {
-        "path": "/home/user/project/tmp/.../codex--gpt-5.4/task_exit_code__0.txt",
+        "path": "/home/user/project/tmp/.../codex--gpt-5.6-sol/task_exit_code__0.txt",
         "size_bytes": 0
       }
     ]
@@ -242,22 +239,22 @@ Notes on the gist:
 2026-04-10 11:16:43 hydra_heads INFO Preflight OK: codex (2.81s)
 2026-04-10 11:16:43 hydra_heads INFO Title generation order (by latency): codex
 2026-04-10 11:16:47 hydra_heads INFO Generated prompt title: answer-two-plus-two-with-number-only
-2026-04-10 11:16:47 hydra_heads INFO Display names: codex--gpt-5.4
+2026-04-10 11:16:47 hydra_heads INFO Display names: codex--gpt-5.6-sol
 2026-04-10 11:16:47 hydra_heads INFO ================================================================
 2026-04-10 11:16:47 hydra_heads INFO TASK START — LOG DIR: ~/.hydra/tasks/2026-04-10-..._0eaf9d0_answer-two-plus-two-with-number-only
 2026-04-10 11:16:47 hydra_heads INFO ================================================================
-2026-04-10 11:16:47 hydra_heads INFO Agent sandbox [codex--gpt-5.4]: ./tmp/2026-04-10-..._answer-two-plus-two.../codex--gpt-5.4
+2026-04-10 11:16:47 hydra_heads INFO Agent sandbox [codex--gpt-5.6-sol]: ./tmp/2026-04-10-..._answer-two-plus-two.../codex--gpt-5.6-sol
 2026-04-10 11:17:05 hydra_heads INFO codex success (exit_code=0) in 17.73s
 2026-04-10 11:17:05 hydra_heads INFO ================================================================
 2026-04-10 11:17:05 hydra_heads INFO TASK END
 2026-04-10 11:17:05 hydra_heads INFO ================================================================
-2026-04-10 11:17:05 hydra_heads INFO --- codex: ./tmp/.../codex--gpt-5.4 ---
-2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.4/logs/stderr.log
-2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.4/logs/stdout.log
-2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.4/response.md
-2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.4/task_exit_code__0.txt
-2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.4/task_finished_at__...txt
-2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.4/task_started_at__...txt
+2026-04-10 11:17:05 hydra_heads INFO --- codex: ./tmp/.../codex--gpt-5.6-sol ---
+2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.6-sol/logs/stderr.log
+2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.6-sol/logs/stdout.log
+2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.6-sol/response.md
+2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.6-sol/task_exit_code__0.txt
+2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.6-sol/task_finished_at__...txt
+2026-04-10 11:17:05 hydra_heads INFO   .../codex--gpt-5.6-sol/task_started_at__...txt
 2026-04-10 11:17:05 hydra_heads INFO ================================================================
 2026-04-10 11:17:05 hydra_heads INFO All providers completed
 ```
@@ -339,7 +336,7 @@ Each agent runs in its own sandbox directory:
   │   ├── task_started_at__2026-04-10T11-16-47.txt
   │   ├── task_finished_at__2026-04-10T11-17-05.txt
   │   └── task_exit_code__0.txt
-  ├── codex--gpt-5.4/
+  ├── codex--gpt-5.6-sol/
   │   └── ...
   └── kimi--kimi-for-coding/
       └── ...
@@ -519,12 +516,11 @@ hydra_heads/
   cli.py               # Arg parsing, --status, --schema, prompt resolution
   providers/
     __init__.py         # Auto-discovery + YAML override + type validation
-    aider.py            # One config dict per provider
     claude.py
     codex.py
-    factory.py
     gemini.py
     goose.py
+    grok.py
     kilo.py
     kimi.py
     ob1.py
@@ -545,18 +541,17 @@ The meta-beauty: the tool that finds the bugs *is* the tool with the bugs. Every
 $ hydra-heads --prompt-file review.txt --timeout 600 --quiet \
   | jq -r 'to_entries[] | "\(.key): \(.value.status) (\(.value.latency_seconds)s)"'
 
-aider--openai_mimo-v2.5: success (29.4s)
 claude--opus: success (42.1s)
-codex--gpt-5.4: success (38.7s)
-factory--claude-sonnet-4: success (51.3s)
+codex--gpt-5.6-sol: success (38.7s)
 gemini--Gemini_3.1_Pro__High_: success (33.5s)
 goose--claude-sonnet-4-6: success (46.1s)
+grok: success (44.0s)
 kimi--kimi-for-coding: success (55.2s)
 kilo--mimo-v2-pro: success (61.8s)
 ob1--o3-pro: success (47.6s)
 opencode--glm-5: success (48.3s)
 pi--groq_meta-llama_llama-4-scout-17b-16e-instruct: success (12.7s)
-qwen--qwen3-max-preview: success (39.4s)
+qwen--qwen3.7-max: success (39.4s)
 ```
 
 Many models. Many opinions. One JSON.
