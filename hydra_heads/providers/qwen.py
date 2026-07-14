@@ -1,9 +1,9 @@
-"""Qwen Code CLI provider — qwen -m qwen3.7-max --yolo -p PROMPT"""
+"""Qwen Code CLI provider — qwen --safe-mode -m qwen3.7-max --yolo -p PROMPT"""
 
 PROVIDER = {
     "name": "qwen",
     "binary": "qwen",
-    "args": ["-m", "qwen3.7-max", "--yolo"],
+    "args": ["--safe-mode", "-m", "qwen3.7-max", "--yolo"],
     "prompt_flag": "-p",
     "model_flag": "-m",
     "env": {"QWEN_CODE_SUPPRESS_YOLO_WARNING": "1"},
