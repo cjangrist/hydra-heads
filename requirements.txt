@@ -1,4 +1,4 @@
-sh==2.2.2
+sh==2.2.4
 python-dotenv==1.2.2
 coloredlogs==15.0.1
 rich>=14.0.0
