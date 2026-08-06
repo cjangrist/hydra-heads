@@ -34,7 +34,7 @@ agy|custom|curl -fsSL https://antigravity.google/cli/install.sh | bash
 claude|custom|claude update
 codex|custom|codex update
 goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
-grok|custom|grok update
+grok|custom|curl -fsSL https://x.ai/cli/install.sh | bash
 kilo|custom|pnpm add --global @kilocode/cli
 kimi|custom|curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
 ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
