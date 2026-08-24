@@ -10,7 +10,6 @@
 #   grok.py     → grok     (Grok Build)
 #   kilo.py     → kilo     (Kilo Code)
 #   kimi.py     → kimi     (Kimi Code)
-#   ob1.py      → ob1      (OB-1)
 #   opencode.py → opencode (OpenCode)
 #   pi.py       → pi       (Pi Coding Agent)
 #   qwen.py     → qwen     (Qwen Code)
@@ -30,16 +29,15 @@ set -eo pipefail
 # Edit these if your install sources differ.
 
 PROVIDER_DEFS="\
-agy|custom|curl -fsSL https://antigravity.google/cli/install.sh | bash
+agy|custom|agy update
 claude|custom|claude update
 codex|custom|codex update
-goose|custom|curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
-grok|custom|curl -fsSL https://x.ai/cli/install.sh | bash
-kilo|custom|pnpm add --global @kilocode/cli
-kimi|custom|curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash
-ob1|custom|curl -fsSL https://dashboard.openblocklabs.com/install | bash
-opencode|custom|export XDG_BIN_DIR=\$HOME/.local/bin; curl -fsSL https://opencode.ai/install | bash
-pi|custom|curl -fsSL https://pi.dev/install.sh | setsid sh
+goose|custom|goose update
+grok|custom|goose update
+kilo|custom|kilo upgrade
+kimi|custom|kimi update
+opencode|custom|opencode upgrade
+pi|custom|pi update --all
 qwen|npm|@qwen-code/qwen-code"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
