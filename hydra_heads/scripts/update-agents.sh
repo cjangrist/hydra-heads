@@ -33,7 +33,7 @@ agy|custom|agy update
 claude|custom|claude update
 codex|custom|codex update
 goose|custom|goose update
-grok|custom|goose update
+grok|custom|grok update
 kilo|custom|kilo upgrade
 kimi|custom|kimi update
 opencode|custom|opencode upgrade
