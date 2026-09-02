@@ -19,12 +19,18 @@
 set -eo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
+# PROVIDER_DEFS describes how to UPDATE a binary that is already installed.
 # Each line: "binary|method|package"
 #   npm|@scope/pkg    → npm install -g @scope/pkg@latest
 #   go|module@latest  → go install module@latest
 #   pip|pkg           → pip install --upgrade pkg
 #   cargo|pkg         → cargo install pkg --force
 #   custom|command    → eval command
+#
+# Most providers ship their own self-update subcommand, so their method is
+# "custom" and the package is that subcommand. A self-update subcommand cannot
+# bootstrap a binary that does not exist yet, so first-install is a separate
+# concern, handled by install_command_for() below.
 #
 # Edit these if your install sources differ.
 
@@ -118,6 +124,39 @@ all_provider_names() {
     echo "$PROVIDER_DEFS" | cut -d'|' -f1 | sort
 }
 
+# Official non-interactive first-install command for a "custom" provider, or empty
+# if none is known. Only consulted when the binary is absent — an installed binary
+# always updates through its own PROVIDER_DEFS entry.
+#
+# These are the vendors' documented one-liners. They live in a case statement rather
+# than a fourth PROVIDER_DEFS field because most contain a pipe, which would collide
+# with that table's '|' separator.
+#
+# Two host-verified quirks are baked in:
+#   pi       — pi.dev's installer shows an interactive reinstall menu whenever a
+#              controlling tty is present (it reads /dev/tty directly, so redirecting
+#              stdin is not enough). setsid detaches the controlling terminal and
+#              forces the installer's no-tty branch, which never prompts.
+#   opencode — its installer hardcodes INSTALL_DIR=$HOME/.opencode/bin (it no longer
+#              honours XDG_BIN_DIR) and then appends a PATH line to the user's shell
+#              rc file, which does nothing for the current process. --no-modify-path
+#              suppresses that edit and the symlink puts opencode on the same PATH
+#              entry every other provider installs to.
+install_command_for() {
+    case "$1" in
+        agy)      echo 'curl -fsSL https://antigravity.google/cli/install.sh | bash' ;;
+        claude)   echo 'curl -fsSL https://claude.ai/install.sh | bash' ;;
+        codex)    echo 'curl -fsSL https://chatgpt.com/codex/install.sh | sh' ;;
+        goose)    echo 'curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash' ;;
+        grok)     echo 'curl -fsSL https://x.ai/cli/install.sh | bash' ;;
+        kilo)     echo 'npm install -g @kilocode/cli' ;;
+        kimi)     echo 'npm install -g @moonshot-ai/kimi-code' ;;
+        opencode) echo 'curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path && mkdir -p "$HOME/.local/bin" && ln -sf "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"' ;;
+        pi)       echo 'curl -fsSL https://pi.dev/install.sh | setsid sh' ;;
+        *)        echo "" ;;
+    esac
+}
+
 # ── Core update logic ────────────────────────────────────────────────────────
 update_provider() {
     local name="$1"
@@ -141,36 +180,62 @@ update_provider() {
         old_ver=$(get_version "$name")
     fi
 
+    # A missing binary cannot run its own self-update subcommand — that is what makes
+    # `agy update` exit 127 on a host with no agy. Swap in the vendor's first-install
+    # one-liner for that case. Methods that install from a package spec (npm/go/pip/
+    # cargo) already bootstrap a missing binary correctly, so they are left alone.
+    local action="update"
+    if [ -z "$bin_path" ] && [ "$method" = "custom" ]; then
+        local install_cmd
+        install_cmd=$(install_command_for "$name")
+        if [ -z "$install_cmd" ]; then
+            echo ""
+            log_info "${BOLD}${name}${RESET} ${DIM}(${method}: ${package})${RESET}"
+            log_fail "$name is not installed and has no install command configured"
+            log_dim "add one to install_command_for() in this script"
+            FAILED="${FAILED} ${name}"
+            return 1
+        fi
+        action="install"
+        method="install"
+        package="$install_cmd"
+    fi
+
     echo ""
     log_info "${BOLD}${name}${RESET} ${DIM}(${method}: ${package})${RESET}"
     if [ -n "$bin_path" ]; then
         log_dim "path: $bin_path"
         log_dim "current: $old_ver"
     else
-        log_warn "binary '$name' not found in PATH — will attempt install"
+        log_warn "binary '$name' not found in PATH — installing"
     fi
 
     if $DRY_RUN; then
         case "$method" in
-            npm)    log_dim "[dry-run] npm install -g ${package}@latest" ;;
-            go)     log_dim "[dry-run] go install ${package}" ;;
-            pip)    log_dim "[dry-run] pip install --upgrade --break-system-packages ${package}" ;;
-            cargo)  log_dim "[dry-run] cargo install ${package} --force" ;;
-            custom) log_dim "[dry-run] ${package}" ;;
-            *)      log_fail "unknown method: $method" ;;
+            npm)     log_dim "[dry-run] npm install -g ${package}@latest" ;;
+            go)      log_dim "[dry-run] go install ${package}" ;;
+            pip)     log_dim "[dry-run] pip install --upgrade --break-system-packages ${package}" ;;
+            cargo)   log_dim "[dry-run] cargo install ${package} --force" ;;
+            custom)  log_dim "[dry-run] ${package}" ;;
+            install) log_dim "[dry-run] ${package}" ;;
+            *)       log_fail "unknown method: $method" ;;
         esac
         SKIPPED="${SKIPPED} ${name}"
         return 0
     fi
 
+    # stdin is closed on every path so an installer that probes it cannot stall a
+    # non-interactive run. Installers that read /dev/tty directly instead of stdin
+    # need their own guard — see the pi entry in install_command_for().
     local output=""
     local rc=0
     case "$method" in
-        npm)    output=$(npm install -g "${package}@latest" 2>&1) || rc=$? ;;
-        go)     output=$(go install "$package" 2>&1) || rc=$? ;;
-        pip)    output=$(pip install --upgrade --break-system-packages "$package" 2>&1) || rc=$? ;;
-        cargo)  output=$(cargo install "$package" --force 2>&1) || rc=$? ;;
-        custom) output=$(eval "$package" 2>&1) || rc=$? ;;
+        npm)     output=$(npm install -g "${package}@latest" 2>&1 </dev/null) || rc=$? ;;
+        go)      output=$(go install "$package" 2>&1 </dev/null) || rc=$? ;;
+        pip)     output=$(pip install --upgrade --break-system-packages "$package" 2>&1 </dev/null) || rc=$? ;;
+        cargo)   output=$(cargo install "$package" --force 2>&1 </dev/null) || rc=$? ;;
+        custom)  output=$(eval "$package" 2>&1 </dev/null) || rc=$? ;;
+        install) output=$(eval "$package" 2>&1 </dev/null) || rc=$? ;;
         *)
             log_fail "unknown install method '$method' for $name"
             FAILED="${FAILED} ${name}"
@@ -179,8 +244,20 @@ update_provider() {
     esac
 
     if [ "$rc" -ne 0 ]; then
-        log_fail "$name update failed (exit $rc)"
-        echo "$output" | tail -5 | while IFS= read -r line; do log_dim "$line"; done
+        log_fail "$name $action failed (exit $rc)"
+        echo "$output" | while IFS= read -r line; do log_dim "$line"; done
+        FAILED="${FAILED} ${name}"
+        return 1
+    fi
+
+    # A fresh install lands in a directory whose contents bash may have already
+    # resolved, so drop the command hash table before looking the binary up again.
+    hash -r 2>/dev/null || true
+    bin_path=$(get_bin_path "$name")
+    if [ -z "$bin_path" ]; then
+        log_fail "$name $action reported success but '$name' is still not on PATH"
+        log_dim "installer output follows:"
+        echo "$output" | while IFS= read -r line; do log_dim "$line"; done
         FAILED="${FAILED} ${name}"
         return 1
     fi
