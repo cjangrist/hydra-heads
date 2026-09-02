@@ -61,6 +61,7 @@ FAILED=""
 SKIPPED=""
 DRY_RUN=false
 PARALLEL=false
+RC_SNAPSHOT_DIR=""
 
 # ── Usage ─────────────────────────────────────────────────────────────────────
 usage() {
@@ -157,6 +158,70 @@ install_command_for() {
     esac
 }
 
+# ── Shell startup file protection ────────────────────────────────────────────
+# Several vendor installers append their own PATH block to the operator's shell
+# startup files, and most offer no way to decline:
+#
+#   agy   — the served install.sh accepts only --dir and --help. The --skip-path
+#           and --skip-aliases flags in Google's docs are NOT implemented in it,
+#           and passing one aborts the install with "Unknown parameter". The
+#           binary's own `agy install` step writes the rc entry.
+#   grok  — rewrites the rc file unconditionally, and also drops a
+#           <rcfile>.bak.<epoch> copy beside it.
+#
+# On a machine whose dotfiles are managed (chezmoi here, but stow or a plain git
+# repo have the same problem) those edits are written outside the source of
+# truth, so they are silently reverted by the next apply — and until then they
+# are duplicates, because every provider lands in a directory that is already on
+# PATH. grok's zsh block additionally runs a second `compinit`.
+#
+# So every provider action is bracketed: copy these files first, compare after,
+# and put back whatever the installer touched. This is deliberately generic
+# rather than a per-installer flag, because it also covers whichever vendor
+# adds the behaviour next.
+#
+# Reverting is safe for the current provider set precisely because none of them
+# depends on the line being removed: agy installs into ~/.local/bin directly,
+# grok and opencode are symlinked into it, and the post-install PATH check below
+# fails loudly if a provider ever stops being reachable without its rc edit.
+SHELL_RC_FILES="${HOME}/.zshrc ${HOME}/.zshenv ${HOME}/.zprofile ${HOME}/.bashrc ${HOME}/.bash_profile ${HOME}/.profile"
+
+# Copy the shell startup files aside, before an installer gets a chance to edit
+# them. Files that do not exist are skipped, so a file an installer creates from
+# nothing is reported rather than deleted.
+snapshot_shell_rc_files() {
+    [ -n "$RC_SNAPSHOT_DIR" ] || return 0
+    mkdir -p "$RC_SNAPSHOT_DIR" 2>/dev/null || return 0
+    for rc_file in $SHELL_RC_FILES; do
+        if [ -f "$rc_file" ]; then
+            cp -p "$rc_file" "${RC_SNAPSHOT_DIR}/$(basename "$rc_file")" 2>/dev/null || true
+        fi
+    done
+    return 0
+}
+
+# Put back any shell startup file the just-run command modified, keeping a copy
+# of the installer's version for inspection. Prints the names of the files it
+# reverted, or nothing when the installer left them alone.
+restore_shell_rc_files() {
+    local provider_name="$1"
+    local reverted=""
+    [ -n "$RC_SNAPSHOT_DIR" ] || { echo ""; return 0; }
+    for rc_file in $SHELL_RC_FILES; do
+        local base saved
+        base=$(basename "$rc_file")
+        saved="${RC_SNAPSHOT_DIR}/${base}"
+        [ -f "$saved" ] || continue
+        [ -f "$rc_file" ] || continue
+        if ! cmp -s "$saved" "$rc_file"; then
+            cp -p "$rc_file" "${RC_SNAPSHOT_DIR}/${base}.${provider_name}-edit" 2>/dev/null || true
+            cp -p "$saved" "$rc_file" 2>/dev/null && reverted="${reverted} ${base}"
+        fi
+    done
+    echo "$reverted"
+    return 0
+}
+
 # ── Core update logic ────────────────────────────────────────────────────────
 update_provider() {
     local name="$1"
@@ -227,6 +292,8 @@ update_provider() {
     # stdin is closed on every path so an installer that probes it cannot stall a
     # non-interactive run. Installers that read /dev/tty directly instead of stdin
     # need their own guard — see the pi entry in install_command_for().
+    snapshot_shell_rc_files
+
     local output=""
     local rc=0
     case "$method" in
@@ -242,6 +309,15 @@ update_provider() {
             return 1
             ;;
     esac
+
+    # Runs whether the command succeeded or failed — an installer that errors out
+    # part-way can still have edited the rc files before dying.
+    local reverted_rc_files
+    reverted_rc_files=$(restore_shell_rc_files "$name")
+    if [ -n "$reverted_rc_files" ]; then
+        log_warn "$name's installer edited shell startup files — reverted:${reverted_rc_files}"
+        log_dim "installer's version kept for inspection in ${RC_SNAPSHOT_DIR}"
+    fi
 
     if [ "$rc" -ne 0 ]; then
         log_fail "$name $action failed (exit $rc)"
@@ -323,6 +399,11 @@ done
 printf "\n${BOLD}🐍 hydra-heads provider updater${RESET}\n"
 printf "${DIM}%s${RESET}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
 $DRY_RUN && printf "${YELLOW}(dry-run mode — no changes will be made)${RESET}\n"
+
+# One snapshot directory per run, holding the pre-install copy of every shell
+# startup file plus, if an installer edits one, that installer's version. Left in
+# place afterwards so the edit can be inspected; it is a handful of small files.
+RC_SNAPSHOT_DIR="${TMPDIR:-/tmp}/update-agents-shell-rc-$(date '+%Y%m%d-%H%M%S')-$$"
 
 # Build target list
 targets=""
