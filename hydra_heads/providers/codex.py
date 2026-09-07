@@ -5,7 +5,7 @@ PROVIDER = {
     "binary": "codex",
     "args": [
         "exec",
-        "-m", "gpt-5.6-sol",
+        "-m", "gpt-6-astra",
         "-c", "service_tier=\"fast\"",
         "-c", "features.fast_mode=true",
         "-c", "model_reasoning_effort=\"xhigh\"",
