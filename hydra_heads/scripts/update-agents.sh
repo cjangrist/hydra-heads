@@ -153,7 +153,15 @@ install_command_for() {
         kilo)     echo 'npm install -g @kilocode/cli' ;;
         kimi)     echo 'npm install -g @moonshot-ai/kimi-code' ;;
         opencode) echo 'curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path && mkdir -p "$HOME/.local/bin" && ln -sf "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"' ;;
-        pi)       echo 'curl -fsSL https://pi.dev/install.sh | setsid sh' ;;
+        pi)
+            # macOS has no setsid command, but Python provides the same syscall.
+            # Keep the vendor installer's no-controlling-TTY behavior on both OSes.
+            if command -v setsid >/dev/null 2>&1; then
+                echo 'curl -fsSL https://pi.dev/install.sh | setsid sh'
+            else
+                echo 'curl -fsSL https://pi.dev/install.sh | python -c '\''import os; os.setsid(); os.execvp("sh", ["sh"])'\'''
+            fi
+            ;;
         *)        echo "" ;;
     esac
 }
