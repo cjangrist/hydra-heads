@@ -25,7 +25,7 @@ agy treats it as the flag's value, not a bare positional, so the leading flags a
 PROVIDER = {
     "name": "gemini",
     "binary": "agy",
-    "args": ["--dangerously-skip-permissions", "--print-timeout", "86400s", "--model", "Gemini 3.1 Pro (High)"],
+    "args": ["--dangerously-skip-permissions", "--print-timeout", "86400s", "--model", "gemini-4-carbon-high"],
     "prompt_flag": "--print",
     "model_flag": "--model",
     "tty": True,
